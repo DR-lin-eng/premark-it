@@ -85,6 +85,9 @@ function createEnvironment () {
   const layoutMode = register('#layout-mode', new StubNode({ id: 'layout-mode', tag: 'select' }))
   layoutMode.value = 'classic'
   layoutMode.options = [new StubNode({ tag: 'option' }), new StubNode({ tag: 'option' })]
+  const templateSelect = register('#template-select', new StubNode({ id: 'template-select', tag: 'select' }))
+  templateSelect.value = 'demo'
+  templateSelect.options = [new StubNode({ tag: 'option' }), new StubNode({ tag: 'option' }), new StubNode({ tag: 'option' })]
   const layoutBalance = register('#layout-balance', new StubNode({ id: 'layout-balance', tag: 'input' }))
   layoutBalance.value = '54'
   register('#layout-balance-value', new StubNode({ id: 'layout-balance-value', tag: 'strong' }))
@@ -104,6 +107,8 @@ function createEnvironment () {
   register('#tokens-view', new StubNode({ id: 'tokens-view', tag: 'pre' }))
   register('#stats-strip', new StubNode({ id: 'stats-strip' }))
   register('#copy-html', new StubNode({ id: 'copy-html', tag: 'button' }))
+  register('#mode-badge', new StubNode({ id: 'mode-badge', tag: 'span' }))
+  register('#template-badge', new StubNode({ id: 'template-badge', tag: 'span' }))
   register('#layout-status', new StubNode({ id: 'layout-status' }))
   register('#copy-status', new StubNode({ id: 'copy-status' }))
   register('#reset-sample', new StubNode({ id: 'reset-sample', tag: 'button' }))
@@ -121,7 +126,11 @@ function createEnvironment () {
     'resetSample',
     'presetLabel',
     'layoutLabel',
+    'templateLabel',
     'layoutBalanceLabel',
+    'heroPills.prepare',
+    'heroPills.dynamic',
+    'heroPills.i18n',
     'options.html',
     'options.linkify',
     'options.typographer',
@@ -249,6 +258,7 @@ function createEnvironment () {
     meta,
     locale,
     layoutMode,
+    templateSelect,
     layoutBalance,
     input,
     preview,
@@ -268,8 +278,10 @@ describe('Demo i18n and layout', function () {
 
     const inputTitle = env.dataI18nNodes.find((node) => node.dataset.i18n === 'inputTitle')
     const layoutLabel = env.dataI18nNodes.find((node) => node.dataset.i18n === 'layoutLabel')
+    const templateLabel = env.dataI18nNodes.find((node) => node.dataset.i18n === 'templateLabel')
     assert.strictEqual(inputTitle.textContent, 'Markdown Source')
     assert.strictEqual(layoutLabel.textContent, 'Layout')
+    assert.strictEqual(templateLabel.textContent, 'Template')
     assert.include(env.input.value, '# Premark-It Demo')
 
     env.locale.value = 'zh-CN'
@@ -277,6 +289,7 @@ describe('Demo i18n and layout', function () {
 
     assert.strictEqual(inputTitle.textContent, 'Markdown 源文')
     assert.strictEqual(layoutLabel.textContent, '布局')
+    assert.strictEqual(templateLabel.textContent, '模板')
     assert.strictEqual(globalThis.document.documentElement.lang, 'zh-CN')
     assert.strictEqual(env.tablist.attributes['aria-label'], '输出视图')
     assert.include(env.input.value, '# Premark-It 演示')
@@ -303,6 +316,10 @@ describe('Demo i18n and layout', function () {
     await new Promise((resolve) => setTimeout(resolve, 0))
 
     assert.include(env.workspace.attributes.style, '--output-fr: 0.620fr')
+    env.templateSelect.value = 'docs'
+    env.templateSelect.dispatch('change')
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    assert.include(env.input.value, 'Premark-It Quickstart')
     env.handle.dispatch('keydown', { key: 'ArrowRight' })
     await new Promise((resolve) => setTimeout(resolve, 0))
     assert.include(env.workspace.attributes.style, '--output-fr: 0.650fr')

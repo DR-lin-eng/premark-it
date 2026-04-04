@@ -33,6 +33,11 @@ const MESSAGES = {
     eyebrow: 'GitHub Pages Demo',
     heroTitle: 'markdown-it compatibility, live in the browser.',
     heroText: 'This playground runs the local rewrite in-browser, shows rendered HTML, and demonstrates the extra <code>prepare()</code> cache layer.',
+    heroPills: {
+      prepare: 'Prepare-first',
+      dynamic: 'Dynamic layout',
+      i18n: 'English / 中文'
+    },
     localeLabel: 'Language',
     localeAriaLabel: 'Language',
     localeOptions: {
@@ -47,10 +52,16 @@ const MESSAGES = {
     resetSample: 'Reset sample',
     presetLabel: 'Preset',
     layoutLabel: 'Layout',
+    templateLabel: 'Template',
     layoutBalanceLabel: 'Layout Balance',
     layoutOptions: {
       classic: 'Classic',
       dynamic: 'Dynamic'
+    },
+    templateOptions: {
+      demo: 'Showcase',
+      article: 'Editorial',
+      docs: 'Docs'
     },
     options: {
       html: 'Allow HTML',
@@ -82,7 +93,8 @@ const MESSAGES = {
       layout: 'Layout',
       reuse: 'Reuse'
     },
-    sampleSource: `# Premark-It Demo
+    sampleTemplates: {
+      demo: `# Premark-It Demo
 
 This playground runs the **local parser build** and shows how the extra \`prepare()\` layer can be reused.
 
@@ -115,7 +127,65 @@ console.log(md.render(prepared));
 \`\`\`
 
 Inline HTML stays escaped by default: <span>safe</span>.
+`,
+      article: `# Designing For Flow
+
+The best demos don't just show a parser. They show how reading can feel editorial, responsive, and alive.
+
+> Layout should react like a publication, not just a scroll of boxes.
+
+![Editorial sample](./assets/test.png)
+
+## Why this matters
+
+- Readers scan before they read.
+- Strong hierarchy creates orientation.
+- Side rails help quotations and figures breathe.
+
+Paragraphs should be allowed to wrap into calmer columns, while supporting content finds its own lane.
+
+## Snapshot
+
+| Element | Treatment |
+| --- | --- |
+| Lead paragraph | Larger rhythm |
+| Figure | Hero or side rail |
+| Quote | Note card |
+| Data | Structured table |
+`,
+      docs: `# Premark-It Quickstart
+
+Use this template to show parser output in a more documentation-oriented style.
+
+## Install
+
+\`\`\`bash
+npm install markdown-it-pretext-compatible
+\`\`\`
+
+## Parse once, render many
+
+\`\`\`js
+import markdownit from "markdown-it-pretext-compatible";
+
+const md = markdownit({ linkify: true, typographer: true });
+const prepared = md.prepare("# hello");
+
+console.log(md.parse(prepared));
+console.log(md.render(prepared));
+\`\`\`
+
+## Capabilities
+
+| API | Purpose |
+| --- | --- |
+| \`prepare()\` | cache token work |
+| \`render()\` | output HTML |
+| Dynamic demo | browser layout showcase |
+
+![Docs sample](./assets/test.png)
 `
+    }
   },
   'zh-CN': {
     htmlLang: 'zh-CN',
@@ -124,6 +194,11 @@ Inline HTML stays escaped by default: <span>safe</span>.
     eyebrow: 'GitHub Pages 演示',
     heroTitle: '在浏览器里直接体验 markdown-it 兼容实现。',
     heroText: '这个演示会在浏览器中运行本地重写实现，展示渲染后的 HTML，并演示额外的 <code>prepare()</code> 缓存层。',
+    heroPills: {
+      prepare: '先 prepare',
+      dynamic: '动态布局',
+      i18n: 'English / 中文'
+    },
     localeLabel: '语言',
     localeAriaLabel: '语言',
     localeOptions: {
@@ -138,10 +213,16 @@ Inline HTML stays escaped by default: <span>safe</span>.
     resetSample: '重置示例',
     presetLabel: '预设',
     layoutLabel: '布局',
+    templateLabel: '模板',
     layoutBalanceLabel: '布局比例',
     layoutOptions: {
       classic: '经典',
       dynamic: '动态'
+    },
+    templateOptions: {
+      demo: '展示',
+      article: '文章',
+      docs: '文档'
     },
     options: {
       html: '允许 HTML',
@@ -173,7 +254,8 @@ Inline HTML stays escaped by default: <span>safe</span>.
       layout: '布局',
       reuse: '复用'
     },
-    sampleSource: `# Premark-It 演示
+    sampleTemplates: {
+      demo: `# Premark-It 演示
 
 这个页面会在浏览器里运行**本地解析器构建**，并展示额外的 \`prepare()\` 缓存层如何复用。
 
@@ -206,7 +288,65 @@ console.log(md.render(prepared));
 \`\`\`
 
 默认情况下，内联 HTML 仍会被转义：<span>安全</span>。
+`,
+      article: `# 为流动感而设计
+
+好的 demo 不只是展示解析器，还应该展示阅读体验如何像被编排过一样流动起来。
+
+> 布局应该像出版物一样响应，而不是一排排机械堆叠的盒子。
+
+![文章示例](./assets/test.png)
+
+## 为什么重要
+
+- 读者会先扫描，再阅读。
+- 清晰层级能快速建立方向感。
+- 侧栏内容会让引用和图片更从容。
+
+正文应该能获得更舒展的行宽，而补充内容则进入自己的叙事轨道。
+
+## 版式快照
+
+| 元素 | 处理方式 |
+| --- | --- |
+| 导言段 | 更大的阅读节奏 |
+| 图片 | Hero 或侧栏 |
+| 引用 | 注释卡片 |
+| 数据 | 结构化表格 |
+`,
+      docs: `# Premark-It 快速开始
+
+这个模板更适合展示文档型内容和 API 说明。
+
+## 安装
+
+\`\`\`bash
+npm install markdown-it-pretext-compatible
+\`\`\`
+
+## 一次 prepare，多次 render
+
+\`\`\`js
+import markdownit from "markdown-it-pretext-compatible";
+
+const md = markdownit({ linkify: true, typographer: true });
+const prepared = md.prepare("# hello");
+
+console.log(md.parse(prepared));
+console.log(md.render(prepared));
+\`\`\`
+
+## 能力概览
+
+| API | 用途 |
+| --- | --- |
+| \`prepare()\` | 缓存 token 工作 |
+| \`render()\` | 输出 HTML |
+| Dynamic demo | 浏览器布局展示 |
+
+![文档示例](./assets/test.png)
 `
+    }
   }
 }
 
@@ -214,6 +354,7 @@ const state = {
   view: 'preview',
   locale: detectLocale(),
   layoutMode: detectLayoutMode(),
+  templateKey: detectTemplateKey(),
   outputRatio: detectOutputRatio(),
   dynamicPrepared: null,
   dynamicKey: '',
@@ -228,6 +369,7 @@ const elements = {
   locale: document.querySelector('#locale-select'),
   preset: document.querySelector('#preset'),
   layoutMode: document.querySelector('#layout-mode'),
+  templateSelect: document.querySelector('#template-select'),
   layoutBalance: document.querySelector('#layout-balance'),
   layoutBalanceValue: document.querySelector('#layout-balance-value'),
   handle: document.querySelector('#workspace-handle'),
@@ -243,6 +385,8 @@ const elements = {
   tokensView: document.querySelector('#tokens-view'),
   stats: document.querySelector('#stats-strip'),
   copyHtml: document.querySelector('#copy-html'),
+  modeBadge: document.querySelector('#mode-badge'),
+  templateBadge: document.querySelector('#template-badge'),
   layoutStatus: document.querySelector('#layout-status'),
   copyStatus: document.querySelector('#copy-status'),
   resetSample: document.querySelector('#reset-sample'),
@@ -253,11 +397,12 @@ const elements = {
 
 elements.locale.value = state.locale
 elements.layoutMode.value = state.layoutMode
+elements.templateSelect.value = state.templateKey
 elements.layoutBalance.value = String(Math.round(state.outputRatio * 100))
 
 applyLocale()
 applyLayoutMode()
-elements.input.value = currentMessages().sampleSource
+elements.input.value = currentTemplateSource()
 
 function translate(path) {
   return path.split('.').reduce((value, part) => value?.[part], currentMessages())
@@ -265,6 +410,10 @@ function translate(path) {
 
 function currentMessages() {
   return MESSAGES[state.locale]
+}
+
+function currentTemplateSource() {
+  return currentMessages().sampleTemplates[state.templateKey]
 }
 
 function detectLocale() {
@@ -289,6 +438,15 @@ function detectLayoutMode() {
     return value === 'dynamic' ? 'dynamic' : 'classic'
   } catch {
     return 'classic'
+  }
+}
+
+function detectTemplateKey() {
+  try {
+    const value = localStorage.getItem('premark-it-demo-template')
+    return ['demo', 'article', 'docs'].includes(value) ? value : 'demo'
+  } catch {
+    return 'demo'
   }
 }
 
@@ -324,6 +482,12 @@ function persistLayoutMode(layoutMode) {
   } catch {}
 }
 
+function persistTemplateKey(templateKey) {
+  try {
+    localStorage.setItem('premark-it-demo-template', templateKey)
+  } catch {}
+}
+
 function persistOutputRatio(outputRatio) {
   try {
     localStorage.setItem(BALANCE_STORAGE_KEY, String(outputRatio))
@@ -349,6 +513,9 @@ function applyLocale() {
   elements.locale.options[1].textContent = messages.localeOptions['zh-CN']
   elements.layoutMode.options[0].textContent = messages.layoutOptions.classic
   elements.layoutMode.options[1].textContent = messages.layoutOptions.dynamic
+  elements.templateSelect.options[0].textContent = messages.templateOptions.demo
+  elements.templateSelect.options[1].textContent = messages.templateOptions.article
+  elements.templateSelect.options[2].textContent = messages.templateOptions.docs
   elements.locale.setAttribute('aria-label', messages.localeAriaLabel)
   elements.input.setAttribute('aria-label', messages.textareaAriaLabel)
   elements.tablist.setAttribute('aria-label', messages.outputViewAriaLabel)
@@ -367,6 +534,8 @@ function applyLayoutMode() {
   elements.handle.classList.toggle('is-hidden', !wide)
   elements.workspace.style.setProperty('--editor-fr', `${(1 - state.outputRatio).toFixed(3)}fr`)
   elements.workspace.style.setProperty('--output-fr', `${state.outputRatio.toFixed(3)}fr`)
+  elements.modeBadge.textContent = state.layoutMode
+  elements.templateBadge.textContent = state.templateKey
   updateLayoutBalanceLabel()
 }
 
@@ -433,7 +602,7 @@ function renderStats(prepared, prepareDuration, renderDuration) {
       label: labels.layout,
       value: state.layoutMode === 'dynamic'
         ? `${elements.layoutMode.value} ${Math.round(state.outputRatio * 100)}%`
-        : elements.layoutMode.value
+        : `${elements.layoutMode.value} / ${state.templateKey}`
     },
     {
       label: labels.reuse,
@@ -696,6 +865,7 @@ elements.input.addEventListener('input', () => {
 for (const element of [
   elements.locale,
   elements.layoutMode,
+  elements.templateSelect,
   elements.layoutBalance,
   elements.preset,
   elements.html,
@@ -711,14 +881,14 @@ for (const element of [
       const previousLocale = state.locale
       const shouldSwapSample =
         elements.input.value.trim().length === 0 ||
-        elements.input.value === MESSAGES[previousLocale].sampleSource
+        elements.input.value === MESSAGES[previousLocale].sampleTemplates[state.templateKey]
 
       state.locale = elements.locale.value
       persistLocale(state.locale)
       applyLocale()
 
       if (shouldSwapSample) {
-        elements.input.value = currentMessages().sampleSource
+        elements.input.value = currentTemplateSource()
         localeSwappedSample = true
       }
     }
@@ -726,6 +896,14 @@ for (const element of [
     if (element === elements.layoutMode) {
       state.layoutMode = elements.layoutMode.value
       persistLayoutMode(state.layoutMode)
+      applyLayoutMode()
+    }
+
+    if (element === elements.templateSelect) {
+      state.templateKey = elements.templateSelect.value
+      persistTemplateKey(state.templateKey)
+      elements.input.value = currentTemplateSource()
+      state.dynamicPrepared = null
       applyLayoutMode()
     }
 
@@ -747,9 +925,10 @@ for (const element of [
 }
 
 elements.resetSample.addEventListener('click', () => {
-  elements.input.value = currentMessages().sampleSource
+  elements.input.value = currentTemplateSource()
   elements.preset.value = 'default'
   elements.layoutMode.value = state.layoutMode
+  elements.templateSelect.value = state.templateKey
   elements.layoutBalance.value = String(Math.round(state.outputRatio * 100))
   elements.html.checked = false
   elements.linkify.checked = true
