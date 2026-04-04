@@ -1,6 +1,8 @@
 const FONT_FAMILY_SANS = '"Space Grotesk", "Avenir Next", "Segoe UI", sans-serif'
 const FONT_FAMILY_MONO = '"IBM Plex Mono", ui-monospace, monospace'
 const WORKSPACE_HANDLE_WIDTH = 18
+const CONTINUATION_DECORATION_HEIGHT = 18
+const CARD_HEIGHT_BUFFER = 10
 
 const STYLE_PRESETS = {
   heading: {
@@ -1049,7 +1051,11 @@ function renderMeasuredText(block, width, styleKey, measurer) {
 
 function renderMeasuredTextLines(lines, styleKey, continuation = false) {
   const style = STYLE_PRESETS[styleKey]
-  const height = lines.length * style.lineHeight + style.cardPadding * 2
+  const height =
+    lines.length * style.lineHeight +
+    style.cardPadding * 2 +
+    (continuation ? CONTINUATION_DECORATION_HEIGHT : 0) +
+    CARD_HEIGHT_BUFFER
   return {
     height,
     html: `
@@ -1072,7 +1078,10 @@ function renderMeasuredListItems(items, ordered, width, measurer, startIndex = 0
   const bulletWidth = measurer.measureText(ordered ? '10. ' : '• ', style)
   const contentWidth = Math.max(140, width - style.cardPadding * 2 - bulletWidth)
   const htmlParts = []
-  let totalHeight = style.cardPadding * 2
+  let totalHeight =
+    style.cardPadding * 2 +
+    (continuation ? CONTINUATION_DECORATION_HEIGHT : 0) +
+    CARD_HEIGHT_BUFFER
 
   items.forEach((itemAtoms, index) => {
     const lines = wrapMeasuredAtoms(itemAtoms, contentWidth, measurer)
@@ -1138,7 +1147,7 @@ function renderDynamicBlock(block, width, measurer) {
         ? `<figcaption>${escapeHtml(block.alt)}</figcaption>`
         : ''
       return {
-        height: imageHeight + (block.alt ? 64 : 32),
+        height: imageHeight + (block.alt ? 64 : 32) + CARD_HEIGHT_BUFFER,
         html: `
           <figure class="dynamic-figure">
             <img src="${escapeAttribute(block.src)}" alt="${escapeAttribute(block.alt)}">
@@ -1155,7 +1164,7 @@ function renderDynamicBlock(block, width, measurer) {
         ? `<div class="dynamic-code-header">${escapeHtml(block.lang)}</div>`
         : ''
       return {
-        height,
+        height: height + CARD_HEIGHT_BUFFER,
         html: `
           <div class="dynamic-card-inner">
             ${header}
@@ -1321,7 +1330,7 @@ function measureTableLayout(block, width, measurer) {
   }
 
   return {
-    height: Math.max(height, 180),
+    height: Math.max(height + CARD_HEIGHT_BUFFER, 180),
     columnWidths
   }
 }
