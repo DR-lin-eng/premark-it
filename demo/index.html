@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Markdown-It Compatible Rewrite Demo</title>
+    <title>Premark-It Demo</title>
     <meta
       name="description"
       content="A GitHub Pages demo for the fully compatible markdown-it rewrite with a Pretext-inspired prepare() cache."
@@ -21,21 +21,30 @@
     <div class="page-shell">
       <header class="hero">
         <div class="hero-copy">
-          <p class="eyebrow">GitHub Pages Demo</p>
-          <h1>markdown-it compatibility, live in the browser.</h1>
-          <p class="hero-text">
+          <p class="eyebrow" data-i18n="eyebrow">GitHub Pages Demo</p>
+          <h1 data-i18n="heroTitle">markdown-it compatibility, live in the browser.</h1>
+          <p class="hero-text" data-i18n-html="heroText">
             This playground runs the local rewrite in-browser, shows rendered HTML,
             and demonstrates the extra <code>prepare()</code> cache layer.
           </p>
         </div>
         <div class="hero-meta">
+          <div class="meta-card locale-card">
+            <label class="meta-field" for="locale-select">
+              <span class="meta-label" data-i18n="localeLabel">Language</span>
+              <select id="locale-select" class="locale-select" aria-label="Language">
+                <option value="en">English</option>
+                <option value="zh-CN">Simplified Chinese</option>
+              </select>
+            </label>
+          </div>
           <div class="meta-card">
-            <span class="meta-label">Package version</span>
+            <span class="meta-label" data-i18n="packageVersionLabel">Package version</span>
             <strong>v__VERSION__</strong>
           </div>
           <div class="meta-card">
-            <span class="meta-label">Modes</span>
-            <strong>Preview, HTML, Tokens</strong>
+            <span class="meta-label" data-i18n="modesLabel">Modes</span>
+            <strong data-i18n="modeSummary">Preview, HTML, Tokens</strong>
           </div>
         </div>
       </header>
@@ -44,17 +53,17 @@
         <section class="panel editor-panel">
           <div class="panel-header">
             <div>
-              <p class="panel-kicker">Input</p>
-              <h2>Markdown Source</h2>
+              <p class="panel-kicker" data-i18n="inputKicker">Input</p>
+              <h2 data-i18n="inputTitle">Markdown Source</h2>
             </div>
-            <button id="reset-sample" class="secondary-button" type="button">
+            <button id="reset-sample" class="secondary-button" type="button" data-i18n="resetSample">
               Reset sample
             </button>
           </div>
 
           <div class="controls-grid">
             <label class="control">
-              <span>Preset</span>
+              <span data-i18n="presetLabel">Preset</span>
               <select id="preset">
                 <option value="default">default</option>
                 <option value="commonmark">commonmark</option>
@@ -64,27 +73,27 @@
 
             <label class="toggle">
               <input id="html" type="checkbox">
-              <span>Allow HTML</span>
+              <span data-i18n="options.html">Allow HTML</span>
             </label>
 
             <label class="toggle">
               <input id="linkify" type="checkbox" checked>
-              <span>Linkify</span>
+              <span data-i18n="options.linkify">Linkify</span>
             </label>
 
             <label class="toggle">
               <input id="typographer" type="checkbox" checked>
-              <span>Typographer</span>
+              <span data-i18n="options.typographer">Typographer</span>
             </label>
 
             <label class="toggle">
               <input id="breaks" type="checkbox">
-              <span>Hard breaks</span>
+              <span data-i18n="options.breaks">Hard breaks</span>
             </label>
 
             <label class="toggle">
               <input id="xhtmlOut" type="checkbox">
-              <span>XHTML output</span>
+              <span data-i18n="options.xhtmlOut">XHTML output</span>
             </label>
           </div>
 
@@ -98,14 +107,14 @@
         <section class="panel output-panel">
           <div class="panel-header">
             <div>
-              <p class="panel-kicker">Output</p>
-              <h2>Live Result</h2>
+              <p class="panel-kicker" data-i18n="outputKicker">Output</p>
+              <h2 data-i18n="outputTitle">Live Result</h2>
             </div>
 
             <div class="tablist" role="tablist" aria-label="Output views">
-              <button class="tab-button is-active" data-view="preview" type="button">Preview</button>
-              <button class="tab-button" data-view="html" type="button">HTML</button>
-              <button class="tab-button" data-view="tokens" type="button">Tokens</button>
+              <button class="tab-button is-active" data-view="preview" type="button" data-i18n="tabs.preview">Preview</button>
+              <button class="tab-button" data-view="html" type="button" data-i18n="tabs.html">HTML</button>
+              <button class="tab-button" data-view="tokens" type="button" data-i18n="tabs.tokens">Tokens</button>
             </div>
           </div>
 
@@ -118,7 +127,7 @@
           </div>
 
           <div class="footer-actions">
-            <button id="copy-html" class="primary-button" type="button">Copy HTML</button>
+            <button id="copy-html" class="primary-button" type="button" data-i18n="copyHtml">Copy HTML</button>
             <span id="copy-status" class="copy-status" aria-live="polite"></span>
           </div>
         </section>

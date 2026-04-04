@@ -133,6 +133,19 @@ textarea {
   font-size: 1.14rem;
 }
 
+.meta-field {
+  display: grid;
+  gap: 10px;
+}
+
+.locale-select {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 0.72rem 0.9rem;
+  background: rgba(255, 255, 255, 0.86);
+}
+
 .workspace {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);

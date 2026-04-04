@@ -27,6 +27,8 @@ const html = md.render(prepared)
 
 The repository now includes a browser demo in [`demo/index.html`](./demo/index.html) and a GitHub Pages workflow in [`.github/workflows/demo-pages.yml`](./.github/workflows/demo-pages.yml).
 
+The demo now supports i18n for English and Simplified Chinese, defaults to the browser locale, and allows manual switching in the UI.
+
 Once the repository is on GitHub and Pages is configured to deploy from GitHub Actions, pushes to `main` or `master` will:
 
 - install dependencies
