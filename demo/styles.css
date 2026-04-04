@@ -342,8 +342,9 @@ textarea {
 
 .rendered-view table {
   width: 100%;
-  min-width: 640px;
+  max-width: 100%;
   margin: 1.4rem 0;
+  table-layout: fixed;
   border-collapse: separate;
   border-spacing: 0;
   background:
@@ -374,6 +375,8 @@ textarea {
   border-bottom: 1px solid rgba(23, 33, 28, 0.12);
   text-align: left;
   vertical-align: top;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .rendered-view tr:last-child td {
@@ -397,6 +400,7 @@ textarea {
 .rendered-view th code {
   background: rgba(19, 32, 27, 0.08);
   color: inherit;
+  white-space: pre-wrap;
 }
 
 .rendered-view pre {
