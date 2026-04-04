@@ -38,3 +38,8 @@ await copyFile(
   path.join(demoDir, 'styles.css'),
   path.join(outDir, 'styles.css')
 )
+
+await copyFile(
+  path.join(rootDir, 'test', 'test.png'),
+  path.join(assetsDir, 'test.png')
+)

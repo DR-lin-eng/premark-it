@@ -69,6 +69,12 @@ This playground runs the **local parser build** and shows how the extra \`prepar
 | \`prepare()\` | Ready |
 | GitHub demo | Ready |
 
+## Image support
+
+Here is a demo image rendered from the repository asset:
+
+![Demo image](./assets/test.png)
+
 \`\`\`js
 import markdownit from "markdown-it-pretext-compatible";
 
@@ -143,6 +149,12 @@ Inline HTML stays escaped by default: <span>safe</span>.
 | \`render()\` | 已就绪 |
 | \`prepare()\` | 已就绪 |
 | GitHub Demo | 已就绪 |
+
+## 图片支持
+
+下面这张图片来自仓库里的静态资源：
+
+![演示图片](./assets/test.png)
 
 \`\`\`js
 import markdownit from "markdown-it-pretext-compatible";
