@@ -16,7 +16,7 @@
     "demo"
   ],
   "scripts": {
-    "test": "mocha test/markdown-it.mjs test/commonmark.mjs test/misc.mjs test/ruler.mjs test/token.mjs test/prepare.mjs",
+    "test": "mocha test/markdown-it.mjs test/commonmark.mjs test/misc.mjs test/ruler.mjs test/token.mjs test/prepare.mjs test/demo-i18n.mjs",
     "test:stress": "mocha test/pathological.mjs",
     "build:demo": "node scripts/build-demo.mjs"
   },
