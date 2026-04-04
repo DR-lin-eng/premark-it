@@ -2,13 +2,28 @@ import markdownit from '../index.mjs'
 import {
   composeDynamicLayout,
   computePreviewMetrics,
-  prepareDynamicDocument
+  prepareDynamicDocumentFromSource
 } from './dynamic-layout.js'
 
 const LOCALES = ['en', 'zh-CN']
 const STORAGE_KEY = 'premark-it-demo-locale'
 const LAYOUT_STORAGE_KEY = 'premark-it-demo-layout'
+const BALANCE_STORAGE_KEY = 'premark-it-demo-layout-balance'
 const metaDescription = document.querySelector('meta[name="description"]')
+const dynamicPrepareCache = {
+  textCache: new Map(),
+  sourceBlockCache: new Map(),
+  semanticCache: new Map(),
+  blockCache: new Map(),
+  documentState: {
+    sourceBlocks: [],
+    resolvedSourceBlocks: []
+  }
+}
+const WORKSPACE_BREAKPOINT = 1120
+const HANDLE_WIDTH = 18
+const PAGE_PADDING_DESKTOP = 28
+const PAGE_PADDING_MOBILE = 16
 
 const MESSAGES = {
   en: {
@@ -32,6 +47,7 @@ const MESSAGES = {
     resetSample: 'Reset sample',
     presetLabel: 'Preset',
     layoutLabel: 'Layout',
+    layoutBalanceLabel: 'Layout Balance',
     layoutOptions: {
       classic: 'Classic',
       dynamic: 'Dynamic'
@@ -55,13 +71,16 @@ const MESSAGES = {
     copyHtml: 'Copy HTML',
     copySuccess: 'HTML copied.',
     copyFailure: 'Clipboard unavailable in this browser.',
+    layoutPreparing: 'Preparing dynamic layout...',
+    layoutReady: 'Dynamic layout ready.',
     emptyState: 'Start typing Markdown to see the output.',
     stats: {
       lines: 'Lines',
       blockTokens: 'Block tokens',
       inlineTokens: 'Inline tokens',
       timing: 'Timing',
-      layout: 'Layout'
+      layout: 'Layout',
+      reuse: 'Reuse'
     },
     sampleSource: `# Premark-It Demo
 
@@ -119,6 +138,7 @@ Inline HTML stays escaped by default: <span>safe</span>.
     resetSample: '重置示例',
     presetLabel: '预设',
     layoutLabel: '布局',
+    layoutBalanceLabel: '布局比例',
     layoutOptions: {
       classic: '经典',
       dynamic: '动态'
@@ -142,13 +162,16 @@ Inline HTML stays escaped by default: <span>safe</span>.
     copyHtml: '复制 HTML',
     copySuccess: 'HTML 已复制。',
     copyFailure: '当前浏览器无法访问剪贴板。',
+    layoutPreparing: '正在准备动态布局...',
+    layoutReady: '动态布局已就绪。',
     emptyState: '开始输入 Markdown，就能看到实时渲染结果。',
     stats: {
       lines: '行数',
       blockTokens: '块级令牌',
       inlineTokens: '行内令牌',
       timing: '耗时',
-      layout: '布局'
+      layout: '布局',
+      reuse: '复用'
     },
     sampleSource: `# Premark-It 演示
 
@@ -191,15 +214,23 @@ const state = {
   view: 'preview',
   locale: detectLocale(),
   layoutMode: detectLayoutMode(),
+  outputRatio: detectOutputRatio(),
   dynamicPrepared: null,
   dynamicKey: '',
-  renderToken: 0
+  renderToken: 0,
+  dragPointerId: null,
+  resizeFrame: 0,
+  prepareHandle: 0,
+  pendingDynamicLayout: false
 }
 
 const elements = {
   locale: document.querySelector('#locale-select'),
   preset: document.querySelector('#preset'),
   layoutMode: document.querySelector('#layout-mode'),
+  layoutBalance: document.querySelector('#layout-balance'),
+  layoutBalanceValue: document.querySelector('#layout-balance-value'),
+  handle: document.querySelector('#workspace-handle'),
   html: document.querySelector('#html'),
   linkify: document.querySelector('#linkify'),
   typographer: document.querySelector('#typographer'),
@@ -212,6 +243,7 @@ const elements = {
   tokensView: document.querySelector('#tokens-view'),
   stats: document.querySelector('#stats-strip'),
   copyHtml: document.querySelector('#copy-html'),
+  layoutStatus: document.querySelector('#layout-status'),
   copyStatus: document.querySelector('#copy-status'),
   resetSample: document.querySelector('#reset-sample'),
   tabs: Array.from(document.querySelectorAll('.tab-button')),
@@ -221,6 +253,7 @@ const elements = {
 
 elements.locale.value = state.locale
 elements.layoutMode.value = state.layoutMode
+elements.layoutBalance.value = String(Math.round(state.outputRatio * 100))
 
 applyLocale()
 applyLayoutMode()
@@ -259,6 +292,17 @@ function detectLayoutMode() {
   }
 }
 
+function detectOutputRatio() {
+  try {
+    const value = Number(localStorage.getItem(BALANCE_STORAGE_KEY))
+    if (Number.isFinite(value)) {
+      return Math.min(0.7, Math.max(0.3, value))
+    }
+  } catch {}
+
+  return 0.54
+}
+
 function readStoredLocale() {
   try {
     const value = localStorage.getItem(STORAGE_KEY)
@@ -277,6 +321,12 @@ function persistLocale(locale) {
 function persistLayoutMode(layoutMode) {
   try {
     localStorage.setItem(LAYOUT_STORAGE_KEY, layoutMode)
+  } catch {}
+}
+
+function persistOutputRatio(outputRatio) {
+  try {
+    localStorage.setItem(BALANCE_STORAGE_KEY, String(outputRatio))
   } catch {}
 }
 
@@ -302,12 +352,26 @@ function applyLocale() {
   elements.locale.setAttribute('aria-label', messages.localeAriaLabel)
   elements.input.setAttribute('aria-label', messages.textareaAriaLabel)
   elements.tablist.setAttribute('aria-label', messages.outputViewAriaLabel)
+  elements.handle.setAttribute('aria-label', messages.layoutBalanceLabel)
+  updateLayoutBalanceLabel()
+  updateLayoutStatus()
 }
 
 function applyLayoutMode() {
   const dynamic = state.layoutMode === 'dynamic'
+  const wide = dynamic && window.innerWidth > WORKSPACE_BREAKPOINT
   elements.workspace.classList.toggle('workspace-dynamic-mode', dynamic)
+  elements.workspace.classList.toggle('workspace-dynamic-wide', wide)
   elements.preview.classList.toggle('rendered-view-dynamic-mode', dynamic)
+  elements.layoutBalance.disabled = !dynamic
+  elements.handle.classList.toggle('is-hidden', !wide)
+  elements.workspace.style.setProperty('--editor-fr', `${(1 - state.outputRatio).toFixed(3)}fr`)
+  elements.workspace.style.setProperty('--output-fr', `${state.outputRatio.toFixed(3)}fr`)
+  updateLayoutBalanceLabel()
+}
+
+function updateLayoutBalanceLabel() {
+  elements.layoutBalanceValue.textContent = `${Math.round(state.outputRatio * 100)}%`
 }
 
 function createParser() {
@@ -348,6 +412,10 @@ function countInlineChildren(tokens) {
 
 function renderStats(prepared, prepareDuration, renderDuration) {
   const labels = currentMessages().stats
+  const reuseValue =
+    state.layoutMode === 'dynamic' && state.dynamicPrepared?.cacheStats
+      ? `P${state.dynamicPrepared.cacheStats.reusedPositionalBlocks} C${state.dynamicPrepared.cacheStats.reusedContentBlocks} M${state.dynamicPrepared.cacheStats.reusedMeasuredBlocks}`
+      : 'n/a'
   const cards = [
     {
       label: labels.lines,
@@ -363,11 +431,19 @@ function renderStats(prepared, prepareDuration, renderDuration) {
     },
     {
       label: labels.layout,
-      value: elements.layoutMode.value
+      value: state.layoutMode === 'dynamic'
+        ? `${elements.layoutMode.value} ${Math.round(state.outputRatio * 100)}%`
+        : elements.layoutMode.value
+    },
+    {
+      label: labels.reuse,
+      value: reuseValue
     },
     {
       label: labels.timing,
-      value: `${prepareDuration.toFixed(2)}ms + ${renderDuration.toFixed(2)}ms`
+      value: state.layoutMode === 'dynamic' && state.dynamicPrepared?.cacheStats
+        ? `${prepareDuration.toFixed(2)}ms + ${renderDuration.toFixed(2)}ms / ${state.dynamicPrepared.cacheStats.changedSourceBlocks} changed`
+        : `${prepareDuration.toFixed(2)}ms + ${renderDuration.toFixed(2)}ms`
     }
   ]
 
@@ -402,6 +478,34 @@ function renderEmptyPreview() {
   elements.htmlView.textContent = ''
   elements.tokensView.textContent = ''
   elements.stats.innerHTML = ''
+  elements.layoutStatus.textContent = ''
+}
+
+function scheduleIdleTask(callback) {
+  if (typeof requestIdleCallback === 'function') {
+    return requestIdleCallback(callback, { timeout: 150 })
+  }
+
+  return setTimeout(() => callback({ didTimeout: false, timeRemaining: () => 0 }), 0)
+}
+
+function cancelIdleTask(handle) {
+  if (!handle) {
+    return
+  }
+
+  if (typeof cancelIdleCallback === 'function') {
+    cancelIdleCallback(handle)
+    return
+  }
+
+  clearTimeout(handle)
+}
+
+function updateLayoutStatus() {
+  elements.layoutStatus.textContent = state.pendingDynamicLayout
+    ? currentMessages().layoutPreparing
+    : (state.layoutMode === 'dynamic' && state.dynamicPrepared ? currentMessages().layoutReady : '')
 }
 
 function dynamicCacheKey(source) {
@@ -415,6 +519,43 @@ function dynamicCacheKey(source) {
     breaks: elements.breaks.checked,
     xhtmlOut: elements.xhtmlOut.checked
   })
+}
+
+function pagePaddingForViewport() {
+  return window.innerWidth <= 760 ? PAGE_PADDING_MOBILE : PAGE_PADDING_DESKTOP
+}
+
+function currentPageWidth() {
+  return Math.min(1440, window.innerWidth - pagePaddingForViewport() * 2)
+}
+
+function setOutputRatio(nextRatio) {
+  state.outputRatio = Math.min(0.7, Math.max(0.3, nextRatio))
+  elements.layoutBalance.value = String(Math.round(state.outputRatio * 100))
+  persistOutputRatio(state.outputRatio)
+  applyLayoutMode()
+}
+
+function updateRatioFromPointer(event) {
+  if (window.innerWidth <= WORKSPACE_BREAKPOINT) {
+    return
+  }
+
+  const pageWidth = currentPageWidth()
+  const left = (window.innerWidth - pageWidth) / 2
+  const usableWidth = pageWidth - HANDLE_WIDTH
+  const editorWidth = Math.min(
+    usableWidth * 0.7,
+    Math.max(usableWidth * 0.3, event.clientX - left - HANDLE_WIDTH / 2)
+  )
+  const outputRatio = 1 - editorWidth / usableWidth
+
+  setOutputRatio(outputRatio)
+}
+
+function stopWorkspaceDrag() {
+  state.dragPointerId = null
+  elements.handle.classList.remove('is-dragging')
 }
 
 function renderDynamicPreview(layout) {
@@ -432,16 +573,38 @@ function renderDynamicPreview(layout) {
   `
 }
 
-async function ensureDynamicPrepared(source, prepared, md, renderToken) {
+function scheduleDynamicRecompose() {
+  if (state.resizeFrame) {
+    cancelAnimationFrame(state.resizeFrame)
+  }
+
+  state.resizeFrame = requestAnimationFrame(() => {
+    state.resizeFrame = 0
+
+    if (state.layoutMode !== 'dynamic' || !state.dynamicPrepared) {
+      return
+    }
+
+    renderDynamicPreview(
+      composeDynamicLayout(
+        state.dynamicPrepared,
+        computePreviewMetrics(window.innerWidth, window.innerHeight, state.outputRatio)
+      )
+    )
+  })
+}
+
+async function ensureDynamicPrepared(source, md, renderToken) {
   const nextKey = dynamicCacheKey(source)
 
   if (state.dynamicPrepared && state.dynamicKey === nextKey) {
     return state.dynamicPrepared
   }
 
-  const dynamicPrepared = await prepareDynamicDocument({
-    prepared,
-    md
+  const dynamicPrepared = await prepareDynamicDocumentFromSource({
+    source,
+    md,
+    cache: dynamicPrepareCache
   })
 
   if (renderToken !== state.renderToken) {
@@ -456,8 +619,11 @@ async function ensureDynamicPrepared(source, prepared, md, renderToken) {
 async function refresh() {
   const source = elements.input.value
   const renderToken = ++state.renderToken
+  cancelIdleTask(state.prepareHandle)
+  state.prepareHandle = 0
 
   if (!source.trim()) {
+    state.pendingDynamicLayout = false
     renderEmptyPreview()
     updateViewSelection()
     return
@@ -478,7 +644,6 @@ async function refresh() {
     return
   }
 
-  renderStats(prepared, prepareDuration, renderDuration)
   elements.htmlView.textContent = html
   elements.tokensView.textContent = JSON.stringify(
     prepared.tokens.map(simplifyToken),
@@ -487,17 +652,39 @@ async function refresh() {
   )
 
   if (state.layoutMode === 'dynamic') {
-    const preparedDynamic = await ensureDynamicPrepared(source, prepared, md, renderToken)
-    if (!preparedDynamic || renderToken !== state.renderToken) {
-      return
-    }
+    const nextKey = dynamicCacheKey(source)
 
-    const metrics = computePreviewMetrics(window.innerWidth, window.innerHeight)
-    renderDynamicPreview(composeDynamicLayout(preparedDynamic, metrics))
+    if (state.dynamicPrepared && state.dynamicKey === nextKey) {
+      state.pendingDynamicLayout = false
+      updateLayoutStatus()
+      const metrics = computePreviewMetrics(window.innerWidth, window.innerHeight, state.outputRatio)
+      renderDynamicPreview(composeDynamicLayout(state.dynamicPrepared, metrics))
+    } else {
+      state.pendingDynamicLayout = true
+      updateLayoutStatus()
+      elements.preview.innerHTML = html
+
+      state.prepareHandle = scheduleIdleTask(async () => {
+        const preparedDynamic = await ensureDynamicPrepared(source, md, renderToken)
+        if (!preparedDynamic || renderToken !== state.renderToken) {
+          return
+        }
+
+        state.pendingDynamicLayout = false
+        updateLayoutStatus()
+        const metrics = computePreviewMetrics(window.innerWidth, window.innerHeight, state.outputRatio)
+        renderDynamicPreview(composeDynamicLayout(preparedDynamic, metrics))
+        renderStats(prepared, prepareDuration, renderDuration)
+        updateViewSelection()
+      })
+    }
   } else {
+    state.pendingDynamicLayout = false
+    updateLayoutStatus()
     elements.preview.innerHTML = html
   }
 
+  renderStats(prepared, prepareDuration, renderDuration)
   updateViewSelection()
 }
 
@@ -509,6 +696,7 @@ elements.input.addEventListener('input', () => {
 for (const element of [
   elements.locale,
   elements.layoutMode,
+  elements.layoutBalance,
   elements.preset,
   elements.html,
   elements.linkify,
@@ -517,6 +705,8 @@ for (const element of [
   elements.xhtmlOut
 ]) {
   element.addEventListener('change', () => {
+    let localeSwappedSample = false
+
     if (element === elements.locale) {
       const previousLocale = state.locale
       const shouldSwapSample =
@@ -529,6 +719,7 @@ for (const element of [
 
       if (shouldSwapSample) {
         elements.input.value = currentMessages().sampleSource
+        localeSwappedSample = true
       }
     }
 
@@ -538,7 +729,15 @@ for (const element of [
       applyLayoutMode()
     }
 
-    if (element !== elements.locale) {
+    if (element === elements.layoutBalance) {
+      setOutputRatio(Number(elements.layoutBalance.value) / 100)
+    }
+
+    if ([elements.preset, elements.html, elements.linkify, elements.typographer, elements.breaks, elements.xhtmlOut].includes(element)) {
+      state.dynamicPrepared = null
+    }
+
+    if (localeSwappedSample) {
       state.dynamicPrepared = null
     }
 
@@ -551,6 +750,7 @@ elements.resetSample.addEventListener('click', () => {
   elements.input.value = currentMessages().sampleSource
   elements.preset.value = 'default'
   elements.layoutMode.value = state.layoutMode
+  elements.layoutBalance.value = String(Math.round(state.outputRatio * 100))
   elements.html.checked = false
   elements.linkify.checked = true
   elements.typographer.checked = true
@@ -578,17 +778,54 @@ elements.copyHtml.addEventListener('click', async () => {
   }
 })
 
+elements.handle.addEventListener('pointerdown', (event) => {
+  if (state.layoutMode !== 'dynamic' || window.innerWidth <= WORKSPACE_BREAKPOINT) {
+    return
+  }
+
+  state.dragPointerId = event.pointerId
+  elements.handle.classList.add('is-dragging')
+  if (typeof elements.handle.setPointerCapture === 'function') {
+    elements.handle.setPointerCapture(event.pointerId)
+  }
+  updateRatioFromPointer(event)
+  refresh()
+})
+
+elements.handle.addEventListener('pointermove', (event) => {
+  if (state.dragPointerId !== event.pointerId) {
+    return
+  }
+
+  updateRatioFromPointer(event)
+  if (state.layoutMode === 'dynamic' && state.dynamicPrepared) {
+    scheduleDynamicRecompose()
+  }
+})
+
+elements.handle.addEventListener('pointerup', stopWorkspaceDrag)
+elements.handle.addEventListener('pointercancel', stopWorkspaceDrag)
+elements.handle.addEventListener('keydown', (event) => {
+  if (state.layoutMode !== 'dynamic') {
+    return
+  }
+
+  if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') {
+    return
+  }
+
+  const delta = event.key === 'ArrowLeft' ? -0.03 : 0.03
+  setOutputRatio(state.outputRatio + delta)
+  refresh()
+})
+
 window.addEventListener('resize', () => {
+  applyLayoutMode()
   if (state.layoutMode !== 'dynamic' || !state.dynamicPrepared) {
     return
   }
 
-  renderDynamicPreview(
-    composeDynamicLayout(
-      state.dynamicPrepared,
-      computePreviewMetrics(window.innerWidth, window.innerHeight)
-    )
-  )
+  scheduleDynamicRecompose()
 })
 
 refresh()

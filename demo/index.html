@@ -79,6 +79,12 @@
               </select>
             </label>
 
+            <label class="control range-control" for="layout-balance">
+              <span data-i18n="layoutBalanceLabel">Layout Balance</span>
+              <input id="layout-balance" type="range" min="30" max="70" step="1" value="54">
+              <strong id="layout-balance-value">54%</strong>
+            </label>
+
             <label class="toggle">
               <input id="html" type="checkbox">
               <span data-i18n="options.html">Allow HTML</span>
@@ -112,6 +118,17 @@
           ></textarea>
         </section>
 
+        <div
+          id="workspace-handle"
+          class="workspace-handle"
+          role="separator"
+          aria-orientation="vertical"
+          aria-label="Resize panels"
+          tabindex="0"
+        >
+          <span class="workspace-handle-grip"></span>
+        </div>
+
         <section class="panel output-panel">
           <div class="panel-header">
             <div>
@@ -136,6 +153,7 @@
 
           <div class="footer-actions">
             <button id="copy-html" class="primary-button" type="button" data-i18n="copyHtml">Copy HTML</button>
+            <span id="layout-status" class="layout-status" aria-live="polite"></span>
             <span id="copy-status" class="copy-status" aria-live="polite"></span>
           </div>
         </section>

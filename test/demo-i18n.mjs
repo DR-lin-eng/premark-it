@@ -15,6 +15,18 @@ class StubNode {
     this.listeners = {}
     this.attributes = {}
     this.options = []
+    this.style = {
+      setProperty: (name, value) => {
+        const current = this.attributes.style ? `${this.attributes.style}; ` : ''
+        const filtered = current
+          .split(';')
+          .map((entry) => entry.trim())
+          .filter(Boolean)
+          .filter((entry) => !entry.startsWith(`${name}:`))
+        filtered.push(`${name}: ${value}`)
+        this.attributes.style = filtered.join('; ')
+      }
+    }
     this.classList = {
       toggle: (name, active) => {
         const classes = new Set(this.className.split(/\s+/).filter(Boolean))
@@ -33,9 +45,9 @@ class StubNode {
     this.attributes[name] = value
   }
 
-  dispatch (type) {
+  dispatch (type, extra = {}) {
     for (const fn of this.listeners[type] || []) {
-      fn({ target: this })
+      fn({ target: this, ...extra })
     }
   }
 }
@@ -73,6 +85,9 @@ function createEnvironment () {
   const layoutMode = register('#layout-mode', new StubNode({ id: 'layout-mode', tag: 'select' }))
   layoutMode.value = 'classic'
   layoutMode.options = [new StubNode({ tag: 'option' }), new StubNode({ tag: 'option' })]
+  const layoutBalance = register('#layout-balance', new StubNode({ id: 'layout-balance', tag: 'input' }))
+  layoutBalance.value = '54'
+  register('#layout-balance-value', new StubNode({ id: 'layout-balance-value', tag: 'strong' }))
 
   register('#html', Object.assign(new StubNode({ id: 'html', tag: 'input' }), { checked: false }))
   register('#linkify', Object.assign(new StubNode({ id: 'linkify', tag: 'input' }), { checked: true }))
@@ -82,11 +97,14 @@ function createEnvironment () {
 
   const input = register('#markdown-input', new StubNode({ id: 'markdown-input', tag: 'textarea' }))
   const workspace = register('.workspace', new StubNode({ className: 'workspace' }))
+  const handle = register('#workspace-handle', new StubNode({ id: 'workspace-handle' }))
+  handle.setPointerCapture = function () {}
   const preview = register('#preview-view', new StubNode({ id: 'preview-view' }))
   register('#html-view', new StubNode({ id: 'html-view', tag: 'pre' }))
   register('#tokens-view', new StubNode({ id: 'tokens-view', tag: 'pre' }))
   register('#stats-strip', new StubNode({ id: 'stats-strip' }))
   register('#copy-html', new StubNode({ id: 'copy-html', tag: 'button' }))
+  register('#layout-status', new StubNode({ id: 'layout-status' }))
   register('#copy-status', new StubNode({ id: 'copy-status' }))
   register('#reset-sample', new StubNode({ id: 'reset-sample', tag: 'button' }))
   const tablist = register('.tablist', new StubNode({ className: 'tablist' }))
@@ -103,6 +121,7 @@ function createEnvironment () {
     'resetSample',
     'presetLabel',
     'layoutLabel',
+    'layoutBalanceLabel',
     'options.html',
     'options.linkify',
     'options.typographer',
@@ -172,8 +191,34 @@ function createEnvironment () {
     value: {
       innerWidth: 1440,
       innerHeight: 900,
+      requestAnimationFrame (callback) {
+        return setTimeout(() => callback(Date.now()), 0)
+      },
+      cancelAnimationFrame (id) {
+        clearTimeout(id)
+      },
       addEventListener () {}
     }
+  })
+
+  Object.defineProperty(globalThis, 'requestAnimationFrame', {
+    configurable: true,
+    value: globalThis.window.requestAnimationFrame
+  })
+
+  Object.defineProperty(globalThis, 'cancelAnimationFrame', {
+    configurable: true,
+    value: globalThis.window.cancelAnimationFrame
+  })
+
+  Object.defineProperty(globalThis, 'requestIdleCallback', {
+    configurable: true,
+    value: (callback) => setTimeout(() => callback({ didTimeout: false, timeRemaining: () => 0 }), 0)
+  })
+
+  Object.defineProperty(globalThis, 'cancelIdleCallback', {
+    configurable: true,
+    value: (id) => clearTimeout(id)
   })
 
   Object.defineProperty(globalThis, 'Image', {
@@ -204,8 +249,10 @@ function createEnvironment () {
     meta,
     locale,
     layoutMode,
+    layoutBalance,
     input,
     preview,
+    handle,
     workspace,
     tablist,
     dataI18nNodes
@@ -249,5 +296,15 @@ describe('Demo i18n and layout', function () {
     assert.include(env.workspace.className, 'workspace-dynamic-mode')
     assert.include(env.preview.className, 'rendered-view-dynamic-mode')
     assert.include(env.preview.innerHTML, 'dynamic-stage')
+    assert.include(env.preview.innerHTML, 'dynamic-card')
+
+    env.layoutBalance.value = '62'
+    env.layoutBalance.dispatch('change')
+    await new Promise((resolve) => setTimeout(resolve, 0))
+
+    assert.include(env.workspace.attributes.style, '--output-fr: 0.620fr')
+    env.handle.dispatch('keydown', { key: 'ArrowRight' })
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    assert.include(env.workspace.attributes.style, '--output-fr: 0.650fr')
   })
 })

@@ -1,5 +1,6 @@
 const FONT_FAMILY_SANS = '"Space Grotesk", "Avenir Next", "Segoe UI", sans-serif'
 const FONT_FAMILY_MONO = '"IBM Plex Mono", ui-monospace, monospace'
+const WORKSPACE_HANDLE_WIDTH = 18
 
 const STYLE_PRESETS = {
   heading: {
@@ -8,6 +9,14 @@ const STYLE_PRESETS = {
     fontFamily: FONT_FAMILY_SANS,
     fontWeight: 700,
     letterSpacing: -0.35,
+    cardPadding: 24
+  },
+  lede: {
+    fontSize: 22,
+    lineHeight: 34,
+    fontFamily: FONT_FAMILY_SANS,
+    fontWeight: 500,
+    letterSpacing: 0,
     cardPadding: 24
   },
   paragraph: {
@@ -76,10 +85,185 @@ function escapeAttribute(value) {
   return escapeHtml(String(value))
 }
 
-function createMeasurer() {
+function normalizeSource(source) {
+  return String(source ?? '').replace(/\r\n?/g, '\n')
+}
+
+function isBlankLine(line) {
+  return /^\s*$/.test(line)
+}
+
+function isFenceStart(line) {
+  return /^ {0,3}(```+|~~~+)/.test(line)
+}
+
+function isBlockquoteLine(line) {
+  return /^ {0,3}>/.test(line)
+}
+
+function isListLine(line) {
+  return /^ {0,3}(?:[*+-]|\d+\.)\s+/.test(line)
+}
+
+function isTableCandidate(lines, index) {
+  const line = lines[index]
+  const next = lines[index + 1]
+  return (
+    Boolean(line) &&
+    Boolean(next) &&
+    /\|/.test(line) &&
+    /^\s*\|?[:\- ]+\|[:\-| ]*\s*$/.test(next)
+  )
+}
+
+function isAtxHeading(line) {
+  return /^ {0,3}#{1,6}\s+/.test(line)
+}
+
+function isThematicBreak(line) {
+  return /^ {0,3}(?:[-*_])(?:\s*\1){2,}\s*$/.test(line)
+}
+
+function isHtmlBlockStart(line) {
+  return /^ {0,3}<(?:!--|[A-Za-z][\w-]*\b|\/[A-Za-z][\w-]*>)/.test(line)
+}
+
+function isSetextUnderline(line) {
+  return /^ {0,3}(?:=+|-+)\s*$/.test(line)
+}
+
+export function splitMarkdownIntoSourceBlocks(source) {
+  const normalized = normalizeSource(source)
+  const lines = normalized.split('\n')
+  const blocks = []
+
+  for (let index = 0; index < lines.length;) {
+    if (isBlankLine(lines[index])) {
+      index += 1
+      continue
+    }
+
+    const start = index
+
+    if (isAtxHeading(lines[index]) || isThematicBreak(lines[index])) {
+      blocks.push(lines[index])
+      index += 1
+      continue
+    }
+
+    if (isFenceStart(lines[index])) {
+      const opener = /^ {0,3}(```+|~~~+)/.exec(lines[index])[1]
+      index += 1
+      while (index < lines.length && !new RegExp(`^ {0,3}${opener}[ \\t]*$`).test(lines[index])) {
+        index += 1
+      }
+      if (index < lines.length) {
+        index += 1
+      }
+      blocks.push(lines.slice(start, index).join('\n'))
+      continue
+    }
+
+    if (isBlockquoteLine(lines[index])) {
+      index += 1
+      while (index < lines.length && (isBlockquoteLine(lines[index]) || isBlankLine(lines[index]))) {
+        index += 1
+      }
+      blocks.push(lines.slice(start, index).join('\n'))
+      continue
+    }
+
+    if (isListLine(lines[index])) {
+      index += 1
+      while (index < lines.length) {
+        if (isBlankLine(lines[index])) {
+          break
+        }
+
+        if (
+          isListLine(lines[index]) ||
+          /^ {2,}/.test(lines[index]) ||
+          /^ {0,3}>/.test(lines[index])
+        ) {
+          index += 1
+          continue
+        }
+
+        break
+      }
+      blocks.push(lines.slice(start, index).join('\n'))
+      continue
+    }
+
+    if (isTableCandidate(lines, index)) {
+      index += 2
+      while (index < lines.length && !isBlankLine(lines[index])) {
+        index += 1
+      }
+      blocks.push(lines.slice(start, index).join('\n'))
+      continue
+    }
+
+    if (isHtmlBlockStart(lines[index])) {
+      index += 1
+      while (index < lines.length && !isBlankLine(lines[index])) {
+        index += 1
+      }
+      blocks.push(lines.slice(start, index).join('\n'))
+      continue
+    }
+
+    index += 1
+    while (
+      index < lines.length &&
+      !isBlankLine(lines[index]) &&
+      !isFenceStart(lines[index]) &&
+      !isAtxHeading(lines[index]) &&
+      !isThematicBreak(lines[index]) &&
+      !isHtmlBlockStart(lines[index])
+    ) {
+      if (index + 1 < lines.length && isSetextUnderline(lines[index + 1])) {
+        index += 2
+        break
+      }
+      index += 1
+    }
+    blocks.push(lines.slice(start, index).join('\n'))
+  }
+
+  return blocks.filter((block) => block.trim().length > 0)
+}
+
+export function diffSourceBlocks(previousBlocks, nextBlocks) {
+  let prefix = 0
+  const prefixLimit = Math.min(previousBlocks.length, nextBlocks.length)
+
+  while (prefix < prefixLimit && previousBlocks[prefix] === nextBlocks[prefix]) {
+    prefix += 1
+  }
+
+  let suffix = 0
+  const suffixLimit = Math.min(previousBlocks.length - prefix, nextBlocks.length - prefix)
+
+  while (
+    suffix < suffixLimit &&
+    previousBlocks[previousBlocks.length - 1 - suffix] === nextBlocks[nextBlocks.length - 1 - suffix]
+  ) {
+    suffix += 1
+  }
+
+  return {
+    prefix,
+    suffix,
+    changedPrevious: Math.max(0, previousBlocks.length - prefix - suffix),
+    changedNext: Math.max(0, nextBlocks.length - prefix - suffix)
+  }
+}
+
+function createMeasurer(sharedCache = new Map()) {
   const canvas = document.createElement('canvas')
   const context = canvas.getContext('2d')
-  const cache = new Map()
+  const cache = sharedCache
 
   function measureText(text, style) {
     const font = styleToFont(style)
@@ -268,6 +452,38 @@ function groupTopLevelTokens(tokens) {
   return groups
 }
 
+function groupLineSpan(group) {
+  let start = null
+  let end = null
+
+  for (const token of group) {
+    if (!token.map) {
+      continue
+    }
+
+    if (start === null || token.map[0] < start) {
+      start = token.map[0]
+    }
+
+    if (end === null || token.map[1] > end) {
+      end = token.map[1]
+    }
+  }
+
+  return start === null || end === null ? null : [start, end]
+}
+
+function groupSourceKey(group, lines) {
+  const span = groupLineSpan(group)
+  const tokenTypes = group.map((token) => token.type).join('|')
+
+  if (!span) {
+    return `${tokenTypes}::${group.map((token) => token.content || '').join('\u0001')}`
+  }
+
+  return `${tokenTypes}::${lines.slice(span[0], span[1]).join('\n')}`
+}
+
 function buildImageBlock(token) {
   return {
     kind: 'image',
@@ -275,6 +491,59 @@ function buildImageBlock(token) {
     alt: token.content || '',
     title: token.attrGet('title') || '',
     ratio: 4 / 3
+  }
+}
+
+function blockSignature(block) {
+  switch (block.kind) {
+    case 'heading':
+    case 'lede':
+    case 'paragraph':
+    case 'quote':
+      return JSON.stringify({
+        kind: block.kind,
+        atoms: block.atoms.map((atom) => ({
+          type: atom.type,
+          text: atom.text ?? '',
+          html: atom.html ?? '',
+          styleState: atom.styleState ?? null
+        }))
+      })
+    case 'list':
+      return JSON.stringify({
+        kind: block.kind,
+        ordered: block.ordered,
+        items: block.items.map((item) => item.map((atom) => ({
+          type: atom.type,
+          text: atom.text ?? '',
+          html: atom.html ?? '',
+          styleState: atom.styleState ?? null
+        })))
+      })
+    case 'image':
+      return JSON.stringify({
+        kind: block.kind,
+        src: block.src,
+        alt: block.alt,
+        title: block.title
+      })
+    case 'code':
+      return JSON.stringify({
+        kind: block.kind,
+        lang: block.lang,
+        code: block.code
+      })
+    case 'table':
+      return JSON.stringify({
+        kind: block.kind,
+        headers: block.headers,
+        rows: block.rows
+      })
+    default:
+      return JSON.stringify({
+        kind: block.kind,
+        html: block.html ?? ''
+      })
   }
 }
 
@@ -563,6 +832,7 @@ function measureImageRatio(src) {
 function prepareSemanticBlock(block, measurer) {
   switch (block.kind) {
     case 'heading':
+    case 'lede':
     case 'paragraph':
     case 'quote':
       return {
@@ -579,44 +849,186 @@ function prepareSemanticBlock(block, measurer) {
   }
 }
 
-export async function prepareDynamicDocument({ prepared, md }) {
+function decorateLayoutHints(blocks) {
+  let firstQuoteAssigned = false
+  let firstImageAssigned = false
+
+  return blocks.map((block) => {
+    if (block.kind === 'heading') {
+      return { ...block, placementHint: 'full' }
+    }
+
+    if (block.kind === 'lede') {
+      return { ...block, placementHint: 'full' }
+    }
+
+    if (block.kind === 'quote' && !firstQuoteAssigned) {
+      firstQuoteAssigned = true
+      return { ...block, placementHint: 'side', variant: 'note' }
+    }
+
+    if (block.kind === 'image' && !firstImageAssigned) {
+      firstImageAssigned = true
+      return { ...block, placementHint: 'side', variant: 'hero' }
+    }
+
+    if (block.kind === 'code' || block.kind === 'table') {
+      return { ...block, placementHint: 'full' }
+    }
+
+    return block
+  })
+}
+
+export async function prepareDynamicDocument({ prepared, md, cache }) {
+  return prepareDynamicDocumentFromSource({
+    source: prepared?.src,
+    md,
+    cache
+  })
+}
+
+export async function prepareDynamicDocumentFromSource({ source, md, cache }) {
   if (document.fonts?.ready) {
     await document.fonts.ready
   }
 
-  const topLevel = groupTopLevelTokens(prepared.tokens)
-  const semanticBlocks = topLevelBlocksToSemantic(topLevel, md, prepared.env || {})
-  const measurer = createMeasurer()
+  const sourceBlocks = splitMarkdownIntoSourceBlocks(source)
+  const previousSourceBlocks = cache?.documentState?.sourceBlocks || []
+  const previousResolvedBlocks = cache?.documentState?.resolvedSourceBlocks || []
+  const diff = diffSourceBlocks(previousSourceBlocks, sourceBlocks)
+  const semanticBlocks = []
+  const resolvedSourceBlocks = new Array(sourceBlocks.length)
+  let reusedPositionalBlocks = 0
+  let reusedContentBlocks = 0
+  let preparedNewSourceBlocks = 0
 
-  const measuredBlocks = []
-  for (const block of semanticBlocks) {
-    if (block.kind === 'image') {
-      measuredBlocks.push(await enrichImageBlock(block))
+  for (let index = 0; index < diff.prefix; index += 1) {
+    const reused = previousResolvedBlocks[index] || []
+    resolvedSourceBlocks[index] = reused
+    semanticBlocks.push(...reused)
+    reusedPositionalBlocks += 1
+  }
+
+  for (let offset = 0; offset < diff.suffix; offset += 1) {
+    const nextIndex = sourceBlocks.length - diff.suffix + offset
+    const previousIndex = previousSourceBlocks.length - diff.suffix + offset
+    const reused = previousResolvedBlocks[previousIndex] || []
+    resolvedSourceBlocks[nextIndex] = reused
+  }
+
+  for (let index = diff.prefix; index < sourceBlocks.length - diff.suffix; index += 1) {
+    const sourceBlock = sourceBlocks[index]
+
+    if (cache?.sourceBlockCache?.has(sourceBlock)) {
+      const reused = cache.sourceBlockCache.get(sourceBlock)
+      resolvedSourceBlocks[index] = reused
+      semanticBlocks.push(...reused)
+      reusedContentBlocks += 1
       continue
     }
 
-    measuredBlocks.push(prepareSemanticBlock(block, measurer))
+    const preparedBlock = md.prepare(sourceBlock, {})
+    const topLevel = groupTopLevelTokens(preparedBlock.tokens)
+    const lines = preparedBlock.src.split('\n')
+    const builtBlocks = []
+
+    for (const group of topLevel) {
+      const sourceKey = groupSourceKey(group, lines)
+
+      if (cache?.semanticCache?.has(sourceKey)) {
+        builtBlocks.push(cache.semanticCache.get(sourceKey))
+        continue
+      }
+
+      const semanticBlock = buildSemanticBlock(group, md, preparedBlock.env || {})
+      cache?.semanticCache?.set(sourceKey, semanticBlock)
+      builtBlocks.push(semanticBlock)
+    }
+
+    cache?.sourceBlockCache?.set(sourceBlock, builtBlocks)
+    resolvedSourceBlocks[index] = builtBlocks
+    semanticBlocks.push(...builtBlocks)
+    preparedNewSourceBlocks += 1
+  }
+
+  for (let offset = 0; offset < diff.suffix; offset += 1) {
+    const nextIndex = sourceBlocks.length - diff.suffix + offset
+    semanticBlocks.push(...(resolvedSourceBlocks[nextIndex] || []))
+  }
+
+  cache.documentState = {
+    sourceBlocks,
+    resolvedSourceBlocks
+  }
+  const measurer = createMeasurer(cache?.textCache)
+
+  const adjustedBlocks = semanticBlocks.map((block, index) => {
+      if (
+        block.kind === 'paragraph' &&
+        index === 1 &&
+        semanticBlocks[0]?.kind === 'heading'
+      ) {
+        return {
+          ...block,
+          kind: 'lede'
+        }
+      }
+
+      return block
+    })
+
+  const measuredBlocks = []
+  let reusedMeasuredBlocks = 0
+
+  for (const block of adjustedBlocks) {
+    const signature = blockSignature(block)
+
+    if (cache?.blockCache?.has(signature)) {
+      measuredBlocks.push(cache.blockCache.get(signature))
+      reusedMeasuredBlocks += 1
+      continue
+    }
+
+    let measuredBlock
+    if (block.kind === 'image') {
+      measuredBlock = await enrichImageBlock(block)
+    } else {
+      measuredBlock = prepareSemanticBlock(block, measurer)
+    }
+
+    cache?.blockCache?.set(signature, measuredBlock)
+    measuredBlocks.push(measuredBlock)
   }
 
   return {
-    source: prepared.src,
-    blocks: measuredBlocks,
+    source: normalizeSource(source),
+    blocks: decorateLayoutHints(measuredBlocks),
     measurer
+    ,
+    cacheStats: {
+      reusedPositionalBlocks,
+      reusedContentBlocks,
+      preparedNewSourceBlocks,
+      reusedMeasuredBlocks,
+      totalBlocks: measuredBlocks.length,
+      changedSourceBlocks: diff.changedNext
+    }
   }
 }
 
-export function computePreviewMetrics(viewportWidth, viewportHeight) {
+export function computePreviewMetrics(viewportWidth, viewportHeight, outputRatio = 0.5) {
   const shellPadding = viewportWidth <= 760 ? 16 : 28
   const pageWidth = Math.min(1440, viewportWidth - shellPadding * 2)
   const workspaceColumns = viewportWidth <= 1120 ? 1 : 2
-  const workspaceGap = 22
   const panelPadding = viewportWidth <= 760 ? 18 : 22
   const cardPadding = 22
+  const workspaceChrome = workspaceColumns === 1 ? 0 : WORKSPACE_HANDLE_WIDTH
 
   const outputPanelWidth =
     workspaceColumns === 1
       ? pageWidth
-      : (pageWidth - workspaceGap) / 2
+      : (pageWidth - workspaceChrome) * outputRatio
 
   const previewWidth = Math.max(320, outputPanelWidth - panelPadding * 2 - cardPadding * 2)
 
@@ -632,12 +1044,16 @@ function renderMeasuredText(block, width, styleKey, measurer) {
   const style = STYLE_PRESETS[styleKey]
   const contentWidth = Math.max(140, width - style.cardPadding * 2)
   const lines = wrapMeasuredAtoms(block.measuredAtoms, contentWidth, measurer)
-  const height = lines.length * style.lineHeight + style.cardPadding * 2
+  return renderMeasuredTextLines(lines, styleKey, false)
+}
 
+function renderMeasuredTextLines(lines, styleKey, continuation = false) {
+  const style = STYLE_PRESETS[styleKey]
+  const height = lines.length * style.lineHeight + style.cardPadding * 2
   return {
     height,
     html: `
-      <div class="dynamic-card-inner">
+      <div class="dynamic-card-inner${continuation ? ' dynamic-card-inner-continuation' : ''}">
         ${lines.map((line) => `<div class="dynamic-line dynamic-line-${styleKey}">${renderLine(line)}</div>`).join('')}
       </div>
     `
@@ -648,19 +1064,26 @@ function renderMeasuredList(block, width, measurer) {
   const style = STYLE_PRESETS.list
   const bulletWidth = measurer.measureText(block.ordered ? '10. ' : '• ', style)
   const contentWidth = Math.max(140, width - style.cardPadding * 2 - bulletWidth)
+  return renderMeasuredListItems(block.measuredItems, block.ordered, width, measurer, 0, false)
+}
+
+function renderMeasuredListItems(items, ordered, width, measurer, startIndex = 0, continuation = false) {
+  const style = STYLE_PRESETS.list
+  const bulletWidth = measurer.measureText(ordered ? '10. ' : '• ', style)
+  const contentWidth = Math.max(140, width - style.cardPadding * 2 - bulletWidth)
   const htmlParts = []
   let totalHeight = style.cardPadding * 2
 
-  block.measuredItems.forEach((itemAtoms, index) => {
+  items.forEach((itemAtoms, index) => {
     const lines = wrapMeasuredAtoms(itemAtoms, contentWidth, measurer)
     totalHeight += lines.length * style.lineHeight
-    if (index < block.measuredItems.length - 1) {
+    if (index < items.length - 1) {
       totalHeight += 8
     }
 
     htmlParts.push(`
       <div class="dynamic-list-item">
-        <span class="dynamic-list-marker">${block.ordered ? `${index + 1}.` : '•'}</span>
+        <span class="dynamic-list-marker">${ordered ? `${startIndex + index + 1}.` : '•'}</span>
         <div class="dynamic-list-lines">
           ${lines.map((line) => `<div class="dynamic-line dynamic-line-list">${renderLine(line)}</div>`).join('')}
         </div>
@@ -670,7 +1093,7 @@ function renderMeasuredList(block, width, measurer) {
 
   return {
     height: totalHeight,
-    html: `<div class="dynamic-card-inner">${htmlParts.join('')}</div>`
+    html: `<div class="dynamic-card-inner${continuation ? ' dynamic-card-inner-continuation' : ''}">${htmlParts.join('')}</div>`
   }
 }
 
@@ -700,6 +1123,8 @@ function renderDynamicBlock(block, width, measurer) {
   switch (block.kind) {
     case 'heading':
       return renderMeasuredText(block, width, 'heading', measurer)
+    case 'lede':
+      return renderMeasuredText(block, width, 'lede', measurer)
     case 'paragraph':
       return renderMeasuredText(block, width, 'paragraph', measurer)
     case 'quote':
@@ -740,15 +1165,17 @@ function renderDynamicBlock(block, width, measurer) {
       }
     }
     case 'table': {
-      const height = estimateTableHeight(block, width, measurer)
+      const { height, columnWidths } = measureTableLayout(block, width, measurer)
       const headerHtml = block.headers.length > 0
         ? `<thead><tr>${block.headers.map((cell) => `<th>${escapeHtml(cell)}</th>`).join('')}</tr></thead>`
         : ''
+      const colgroup = `<colgroup>${columnWidths.map((columnWidth) => `<col style="width:${columnWidth}px">`).join('')}</colgroup>`
       return {
         height,
         html: `
           <div class="dynamic-card-inner">
             <table class="dynamic-table">
+              ${colgroup}
               ${headerHtml}
               <tbody>
                 ${block.rows.map((row) => `<tr>${row.map((cell) => `<td>${escapeHtml(cell)}</td>`).join('')}</tr>`).join('')}
@@ -766,13 +1193,68 @@ function renderDynamicBlock(block, width, measurer) {
   }
 }
 
+function splitTextBlock(block, width, styleKey, measurer, maxLinesPerFragment) {
+  const style = STYLE_PRESETS[styleKey]
+  const contentWidth = Math.max(140, width - style.cardPadding * 2)
+  const lines = wrapMeasuredAtoms(block.measuredAtoms, contentWidth, measurer)
+
+  if (lines.length <= maxLinesPerFragment) {
+    return [renderMeasuredTextLines(lines, styleKey, false)]
+  }
+
+  const fragments = []
+  for (let index = 0; index < lines.length; index += maxLinesPerFragment) {
+    fragments.push(
+      renderMeasuredTextLines(
+        lines.slice(index, index + maxLinesPerFragment),
+        styleKey,
+        index > 0
+      )
+    )
+  }
+
+  return fragments
+}
+
+function splitListBlock(block, width, measurer, maxItemsPerFragment) {
+  if (block.measuredItems.length <= maxItemsPerFragment) {
+    return [renderMeasuredList(block, width, measurer)]
+  }
+
+  const fragments = []
+  for (let index = 0; index < block.measuredItems.length; index += maxItemsPerFragment) {
+    fragments.push(
+      renderMeasuredListItems(
+        block.measuredItems.slice(index, index + maxItemsPerFragment),
+        block.ordered,
+        width,
+        measurer,
+        index,
+        index > 0
+      )
+    )
+  }
+
+  return fragments
+}
+
+function createRenderedFragments(block, width, measurer, metrics) {
+  if (metrics.wide && block.kind === 'paragraph') {
+    return splitTextBlock(block, width, 'paragraph', measurer, 6)
+  }
+
+  if (metrics.wide && block.kind === 'list' && block.measuredItems.length > 5) {
+    return splitListBlock(block, width, measurer, 4)
+  }
+
+  return [renderDynamicBlock(block, width, measurer)]
+}
+
 function resolveLane(block, compositionState) {
-  if (block.kind === 'heading') return 'full'
-  if (block.kind === 'code' || block.kind === 'table') return 'full'
-  if (compositionState.wide && block.kind === 'quote') return 'side'
-  if (compositionState.wide && block.kind === 'image' && !compositionState.usedImageLane) {
-    compositionState.usedImageLane = true
-    return 'main'
+  if (block.placementHint === 'full') return 'full'
+
+  if (compositionState.wide && block.placementHint === 'side') {
+    return 'side'
   }
 
   if (!compositionState.wide) {
@@ -783,7 +1265,65 @@ function resolveLane(block, compositionState) {
 }
 
 function cardClassName(block) {
-  return `dynamic-card dynamic-card-${block.kind}`
+  return [
+    'dynamic-card',
+    `dynamic-card-${block.kind}`,
+    block.variant ? `dynamic-card-${block.variant}` : ''
+  ]
+    .filter(Boolean)
+    .join(' ')
+}
+
+function measureTableLayout(block, width, measurer) {
+  const style = STYLE_PRESETS.table
+  const columnCount = Math.max(block.headers.length, block.rows[0]?.length || 0, 1)
+  const innerWidth = Math.max(160, width - style.cardPadding * 2)
+  const rawColumnWidths = new Array(columnCount).fill(88)
+
+  const measuredWidthForCell = (text) => {
+    const atoms = measureAtoms(textToAtoms(text, {}, 'table'), 'table', measurer)
+    return atoms.reduce((sum, atom) => sum + (atom.width || 0), 0) + 26
+  }
+
+  for (let index = 0; index < columnCount; index += 1) {
+    rawColumnWidths[index] = Math.max(rawColumnWidths[index], measuredWidthForCell(block.headers[index] || ''))
+    for (const row of block.rows) {
+      rawColumnWidths[index] = Math.max(rawColumnWidths[index], measuredWidthForCell(row[index] || ''))
+    }
+  }
+
+  let columnWidths = rawColumnWidths.slice()
+  const totalRaw = rawColumnWidths.reduce((sum, value) => sum + value, 0)
+
+  if (totalRaw > innerWidth) {
+    const minWidth = 96
+    const scaled = columnWidths.map((value) => Math.max(minWidth, value * innerWidth / totalRaw))
+    const scaledTotal = scaled.reduce((sum, value) => sum + value, 0)
+    columnWidths = scaled.map((value) => value * innerWidth / scaledTotal)
+  } else {
+    const extra = innerWidth - totalRaw
+    const distribution = extra / columnCount
+    columnWidths = columnWidths.map((value) => value + distribution)
+  }
+
+  const lineCountForCell = (text, columnWidth) => {
+    const atoms = measureAtoms(textToAtoms(text, {}, 'table'), 'table', measurer)
+    return wrapMeasuredAtoms(atoms, Math.max(72, columnWidth - 26), measurer).length
+  }
+
+  let height = style.cardPadding * 2 + (block.headers.length > 0 ? style.lineHeight + 16 : 0)
+  for (const row of block.rows) {
+    const rowLines = Math.max(
+      ...row.map((cell, index) => lineCountForCell(cell, columnWidths[index] || columnWidths[0])),
+      1
+    )
+    height += rowLines * style.lineHeight + 14
+  }
+
+  return {
+    height: Math.max(height, 180),
+    columnWidths
+  }
 }
 
 export function composeDynamicLayout(preparedDynamicDocument, metrics) {
@@ -805,39 +1345,58 @@ export function composeDynamicLayout(preparedDynamicDocument, metrics) {
   const cards = []
 
   for (const block of preparedDynamicDocument.blocks) {
-    const lane = resolveLane(block, compositionState)
-    const width =
-      lane === 'full'
+    const initialLane = resolveLane(block, compositionState)
+    const initialWidth =
+      initialLane === 'full'
         ? metrics.previewWidth
-        : lane === 'main'
+        : initialLane === 'main'
           ? mainWidth
           : sideWidth
-    const rendered = renderDynamicBlock(block, width, preparedDynamicDocument.measurer)
 
-    let x = 0
-    let y = 0
+    const renderedFragments = createRenderedFragments(
+      block,
+      initialWidth,
+      preparedDynamicDocument.measurer,
+      metrics
+    )
 
-    if (lane === 'full') {
-      y = Math.max(compositionState.mainY, compositionState.sideY)
-      compositionState.mainY = y + rendered.height + 18
-      compositionState.sideY = compositionState.mainY
-    } else if (lane === 'main') {
-      x = 0
-      y = compositionState.mainY
-      compositionState.mainY += rendered.height + 18
-    } else {
-      x = mainWidth + gap
-      y = compositionState.sideY
-      compositionState.sideY += rendered.height + 18
-    }
+    renderedFragments.forEach((rendered, index) => {
+      const lane =
+        index === 0 || initialLane === 'full' || !metrics.wide
+          ? initialLane
+          : (compositionState.mainY <= compositionState.sideY ? 'main' : 'side')
+      const width =
+        lane === 'full'
+          ? metrics.previewWidth
+          : lane === 'main'
+            ? mainWidth
+            : sideWidth
 
-    cards.push({
-      x,
-      y,
-      width,
-      height: rendered.height,
-      className: cardClassName(block),
-      html: rendered.html
+      let x = 0
+      let y = 0
+
+      if (lane === 'full') {
+        y = Math.max(compositionState.mainY, compositionState.sideY)
+        compositionState.mainY = y + rendered.height + 18
+        compositionState.sideY = compositionState.mainY
+      } else if (lane === 'main') {
+        x = 0
+        y = compositionState.mainY
+        compositionState.mainY += rendered.height + 18
+      } else {
+        x = mainWidth + gap
+        y = compositionState.sideY
+        compositionState.sideY += rendered.height + 18
+      }
+
+      cards.push({
+        x,
+        y,
+        width,
+        height: rendered.height,
+        className: `${cardClassName(block)}${index > 0 ? ' dynamic-card-continuation' : ''}`,
+        html: rendered.html
+      })
     })
   }
 
