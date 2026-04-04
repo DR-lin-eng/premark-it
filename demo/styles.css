@@ -340,6 +340,65 @@ textarea {
   border-radius: 16px;
 }
 
+.rendered-view table {
+  width: 100%;
+  min-width: 640px;
+  margin: 1.4rem 0;
+  border-collapse: separate;
+  border-spacing: 0;
+  background:
+    linear-gradient(180deg, rgba(248, 252, 250, 0.96), rgba(242, 247, 244, 0.98));
+  border: 1px solid rgba(23, 33, 28, 0.16);
+  border-radius: 18px;
+  overflow: hidden;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    0 18px 40px rgba(23, 33, 28, 0.08);
+}
+
+.rendered-view thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background:
+    linear-gradient(180deg, #e0f0e7 0%, #d3eadf 100%);
+  color: #102019;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.rendered-view th,
+.rendered-view td {
+  padding: 0.9rem 1rem;
+  border-right: 1px solid rgba(23, 33, 28, 0.12);
+  border-bottom: 1px solid rgba(23, 33, 28, 0.12);
+  text-align: left;
+  vertical-align: top;
+}
+
+.rendered-view tr:last-child td {
+  border-bottom: 0;
+}
+
+.rendered-view th:last-child,
+.rendered-view td:last-child {
+  border-right: 0;
+}
+
+.rendered-view tbody tr:nth-child(even) td {
+  background: rgba(14, 139, 116, 0.03);
+}
+
+.rendered-view tbody tr:hover td {
+  background: rgba(255, 184, 77, 0.14);
+}
+
+.rendered-view td code,
+.rendered-view th code {
+  background: rgba(19, 32, 27, 0.08);
+  color: inherit;
+}
+
 .rendered-view pre {
   padding: 18px;
 }
