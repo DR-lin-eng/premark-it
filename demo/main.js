@@ -1,7 +1,13 @@
 import markdownit from '../index.mjs'
+import {
+  composeDynamicLayout,
+  computePreviewMetrics,
+  prepareDynamicDocument
+} from './dynamic-layout.js'
 
 const LOCALES = ['en', 'zh-CN']
 const STORAGE_KEY = 'premark-it-demo-locale'
+const LAYOUT_STORAGE_KEY = 'premark-it-demo-layout'
 const metaDescription = document.querySelector('meta[name="description"]')
 
 const MESSAGES = {
@@ -25,6 +31,11 @@ const MESSAGES = {
     inputTitle: 'Markdown Source',
     resetSample: 'Reset sample',
     presetLabel: 'Preset',
+    layoutLabel: 'Layout',
+    layoutOptions: {
+      classic: 'Classic',
+      dynamic: 'Dynamic'
+    },
     options: {
       html: 'Allow HTML',
       linkify: 'Linkify',
@@ -49,7 +60,8 @@ const MESSAGES = {
       lines: 'Lines',
       blockTokens: 'Block tokens',
       inlineTokens: 'Inline tokens',
-      timing: 'Timing'
+      timing: 'Timing',
+      layout: 'Layout'
     },
     sampleSource: `# Premark-It Demo
 
@@ -106,6 +118,11 @@ Inline HTML stays escaped by default: <span>safe</span>.
     inputTitle: 'Markdown 源文',
     resetSample: '重置示例',
     presetLabel: '预设',
+    layoutLabel: '布局',
+    layoutOptions: {
+      classic: '经典',
+      dynamic: '动态'
+    },
     options: {
       html: '允许 HTML',
       linkify: '自动链接',
@@ -130,7 +147,8 @@ Inline HTML stays escaped by default: <span>safe</span>.
       lines: '行数',
       blockTokens: '块级令牌',
       inlineTokens: '行内令牌',
-      timing: '耗时'
+      timing: '耗时',
+      layout: '布局'
     },
     sampleSource: `# Premark-It 演示
 
@@ -171,18 +189,24 @@ console.log(md.render(prepared));
 
 const state = {
   view: 'preview',
-  locale: detectLocale()
+  locale: detectLocale(),
+  layoutMode: detectLayoutMode(),
+  dynamicPrepared: null,
+  dynamicKey: '',
+  renderToken: 0
 }
 
 const elements = {
   locale: document.querySelector('#locale-select'),
   preset: document.querySelector('#preset'),
+  layoutMode: document.querySelector('#layout-mode'),
   html: document.querySelector('#html'),
   linkify: document.querySelector('#linkify'),
   typographer: document.querySelector('#typographer'),
   breaks: document.querySelector('#breaks'),
   xhtmlOut: document.querySelector('#xhtmlOut'),
   input: document.querySelector('#markdown-input'),
+  workspace: document.querySelector('.workspace'),
   preview: document.querySelector('#preview-view'),
   htmlView: document.querySelector('#html-view'),
   tokensView: document.querySelector('#tokens-view'),
@@ -196,8 +220,10 @@ const elements = {
 }
 
 elements.locale.value = state.locale
+elements.layoutMode.value = state.layoutMode
 
 applyLocale()
+applyLayoutMode()
 elements.input.value = currentMessages().sampleSource
 
 function translate(path) {
@@ -224,6 +250,15 @@ function detectLocale() {
     : 'en'
 }
 
+function detectLayoutMode() {
+  try {
+    const value = localStorage.getItem(LAYOUT_STORAGE_KEY)
+    return value === 'dynamic' ? 'dynamic' : 'classic'
+  } catch {
+    return 'classic'
+  }
+}
+
 function readStoredLocale() {
   try {
     const value = localStorage.getItem(STORAGE_KEY)
@@ -236,6 +271,12 @@ function readStoredLocale() {
 function persistLocale(locale) {
   try {
     localStorage.setItem(STORAGE_KEY, locale)
+  } catch {}
+}
+
+function persistLayoutMode(layoutMode) {
+  try {
+    localStorage.setItem(LAYOUT_STORAGE_KEY, layoutMode)
   } catch {}
 }
 
@@ -256,9 +297,17 @@ function applyLocale() {
 
   elements.locale.options[0].textContent = messages.localeOptions.en
   elements.locale.options[1].textContent = messages.localeOptions['zh-CN']
+  elements.layoutMode.options[0].textContent = messages.layoutOptions.classic
+  elements.layoutMode.options[1].textContent = messages.layoutOptions.dynamic
   elements.locale.setAttribute('aria-label', messages.localeAriaLabel)
   elements.input.setAttribute('aria-label', messages.textareaAriaLabel)
   elements.tablist.setAttribute('aria-label', messages.outputViewAriaLabel)
+}
+
+function applyLayoutMode() {
+  const dynamic = state.layoutMode === 'dynamic'
+  elements.workspace.classList.toggle('workspace-dynamic-mode', dynamic)
+  elements.preview.classList.toggle('rendered-view-dynamic-mode', dynamic)
 }
 
 function createParser() {
@@ -313,6 +362,10 @@ function renderStats(prepared, prepareDuration, renderDuration) {
       value: String(countInlineChildren(prepared.tokens))
     },
     {
+      label: labels.layout,
+      value: elements.layoutMode.value
+    },
+    {
       label: labels.timing,
       value: `${prepareDuration.toFixed(2)}ms + ${renderDuration.toFixed(2)}ms`
     }
@@ -351,8 +404,58 @@ function renderEmptyPreview() {
   elements.stats.innerHTML = ''
 }
 
-function refresh() {
+function dynamicCacheKey(source) {
+  return JSON.stringify({
+    source,
+    locale: state.locale,
+    preset: elements.preset.value,
+    html: elements.html.checked,
+    linkify: elements.linkify.checked,
+    typographer: elements.typographer.checked,
+    breaks: elements.breaks.checked,
+    xhtmlOut: elements.xhtmlOut.checked
+  })
+}
+
+function renderDynamicPreview(layout) {
+  elements.preview.innerHTML = `
+    <div class="dynamic-stage" style="height:${Math.ceil(layout.height)}px">
+      ${layout.cards.map((card) => `
+        <section
+          class="${card.className}"
+          style="left:${Math.round(card.x)}px;top:${Math.round(card.y)}px;width:${Math.round(card.width)}px;height:${Math.round(card.height)}px"
+        >
+          ${card.html}
+        </section>
+      `).join('')}
+    </div>
+  `
+}
+
+async function ensureDynamicPrepared(source, prepared, md, renderToken) {
+  const nextKey = dynamicCacheKey(source)
+
+  if (state.dynamicPrepared && state.dynamicKey === nextKey) {
+    return state.dynamicPrepared
+  }
+
+  const dynamicPrepared = await prepareDynamicDocument({
+    prepared,
+    md
+  })
+
+  if (renderToken !== state.renderToken) {
+    return null
+  }
+
+  state.dynamicPrepared = dynamicPrepared
+  state.dynamicKey = nextKey
+  return dynamicPrepared
+}
+
+async function refresh() {
   const source = elements.input.value
+  const renderToken = ++state.renderToken
 
   if (!source.trim()) {
     renderEmptyPreview()
@@ -371,21 +474,41 @@ function refresh() {
   const html = md.render(prepared)
   const renderDuration = performance.now() - renderStart
 
+  if (renderToken !== state.renderToken) {
+    return
+  }
+
   renderStats(prepared, prepareDuration, renderDuration)
-  elements.preview.innerHTML = html
   elements.htmlView.textContent = html
   elements.tokensView.textContent = JSON.stringify(
     prepared.tokens.map(simplifyToken),
     null,
     2
   )
+
+  if (state.layoutMode === 'dynamic') {
+    const preparedDynamic = await ensureDynamicPrepared(source, prepared, md, renderToken)
+    if (!preparedDynamic || renderToken !== state.renderToken) {
+      return
+    }
+
+    const metrics = computePreviewMetrics(window.innerWidth, window.innerHeight)
+    renderDynamicPreview(composeDynamicLayout(preparedDynamic, metrics))
+  } else {
+    elements.preview.innerHTML = html
+  }
+
   updateViewSelection()
 }
 
-elements.input.addEventListener('input', refresh)
+elements.input.addEventListener('input', () => {
+  state.dynamicPrepared = null
+  refresh()
+})
 
 for (const element of [
   elements.locale,
+  elements.layoutMode,
   elements.preset,
   elements.html,
   elements.linkify,
@@ -407,10 +530,19 @@ for (const element of [
       if (shouldSwapSample) {
         elements.input.value = currentMessages().sampleSource
       }
-
-      elements.copyStatus.textContent = ''
     }
 
+    if (element === elements.layoutMode) {
+      state.layoutMode = elements.layoutMode.value
+      persistLayoutMode(state.layoutMode)
+      applyLayoutMode()
+    }
+
+    if (element !== elements.locale) {
+      state.dynamicPrepared = null
+    }
+
+    elements.copyStatus.textContent = ''
     refresh()
   })
 }
@@ -418,12 +550,14 @@ for (const element of [
 elements.resetSample.addEventListener('click', () => {
   elements.input.value = currentMessages().sampleSource
   elements.preset.value = 'default'
+  elements.layoutMode.value = state.layoutMode
   elements.html.checked = false
   elements.linkify.checked = true
   elements.typographer.checked = true
   elements.breaks.checked = false
   elements.xhtmlOut.checked = false
   state.view = 'preview'
+  state.dynamicPrepared = null
   elements.copyStatus.textContent = ''
   refresh()
 })
@@ -442,6 +576,19 @@ elements.copyHtml.addEventListener('click', async () => {
   } catch (error) {
     elements.copyStatus.textContent = currentMessages().copyFailure
   }
+})
+
+window.addEventListener('resize', () => {
+  if (state.layoutMode !== 'dynamic' || !state.dynamicPrepared) {
+    return
+  }
+
+  renderDynamicPreview(
+    composeDynamicLayout(
+      state.dynamicPrepared,
+      computePreviewMetrics(window.innerWidth, window.innerHeight)
+    )
+  )
 })
 
 refresh()

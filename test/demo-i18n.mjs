@@ -70,6 +70,9 @@ function createEnvironment () {
 
   const preset = register('#preset', new StubNode({ id: 'preset', tag: 'select' }))
   preset.value = 'default'
+  const layoutMode = register('#layout-mode', new StubNode({ id: 'layout-mode', tag: 'select' }))
+  layoutMode.value = 'classic'
+  layoutMode.options = [new StubNode({ tag: 'option' }), new StubNode({ tag: 'option' })]
 
   register('#html', Object.assign(new StubNode({ id: 'html', tag: 'input' }), { checked: false }))
   register('#linkify', Object.assign(new StubNode({ id: 'linkify', tag: 'input' }), { checked: true }))
@@ -78,7 +81,8 @@ function createEnvironment () {
   register('#xhtmlOut', Object.assign(new StubNode({ id: 'xhtmlOut', tag: 'input' }), { checked: false }))
 
   const input = register('#markdown-input', new StubNode({ id: 'markdown-input', tag: 'textarea' }))
-  register('#preview-view', new StubNode({ id: 'preview-view' }))
+  const workspace = register('.workspace', new StubNode({ className: 'workspace' }))
+  const preview = register('#preview-view', new StubNode({ id: 'preview-view' }))
   register('#html-view', new StubNode({ id: 'html-view', tag: 'pre' }))
   register('#tokens-view', new StubNode({ id: 'tokens-view', tag: 'pre' }))
   register('#stats-strip', new StubNode({ id: 'stats-strip' }))
@@ -98,6 +102,7 @@ function createEnvironment () {
     'inputTitle',
     'resetSample',
     'presetLabel',
+    'layoutLabel',
     'options.html',
     'options.linkify',
     'options.typographer',
@@ -136,6 +141,18 @@ function createEnvironment () {
       if (selector === '.tab-button') return tabButtons
       if (selector === '[data-view-panel]') return panels
       return []
+    },
+    createElement () {
+      return {
+        getContext () {
+          return {
+            font: '',
+            measureText (text) {
+              return { width: String(text).length * 8 }
+            }
+          }
+        }
+      }
     }
   }
 
@@ -146,6 +163,26 @@ function createEnvironment () {
       language: 'en-US',
       clipboard: {
         async writeText () {}
+      }
+    }
+  })
+
+  Object.defineProperty(globalThis, 'window', {
+    configurable: true,
+    value: {
+      innerWidth: 1440,
+      innerHeight: 900,
+      addEventListener () {}
+    }
+  })
+
+  Object.defineProperty(globalThis, 'Image', {
+    configurable: true,
+    value: class {
+      set src (_value) {
+        this.naturalWidth = 1200
+        this.naturalHeight = 800
+        queueMicrotask(() => this.onload?.())
       }
     }
   })
@@ -166,13 +203,16 @@ function createEnvironment () {
   return {
     meta,
     locale,
+    layoutMode,
     input,
+    preview,
+    workspace,
     tablist,
     dataI18nNodes
   }
 }
 
-describe('Demo i18n', function () {
+describe('Demo i18n and layout', function () {
   it('switches the demo UI and sample markdown to Simplified Chinese', async function () {
     const env = createEnvironment()
     const moduleUrl = pathToFileURL(path.resolve('demo/main.js')).href + `?test=${Date.now()}`
@@ -180,16 +220,34 @@ describe('Demo i18n', function () {
     await import(moduleUrl)
 
     const inputTitle = env.dataI18nNodes.find((node) => node.dataset.i18n === 'inputTitle')
+    const layoutLabel = env.dataI18nNodes.find((node) => node.dataset.i18n === 'layoutLabel')
     assert.strictEqual(inputTitle.textContent, 'Markdown Source')
+    assert.strictEqual(layoutLabel.textContent, 'Layout')
     assert.include(env.input.value, '# Premark-It Demo')
 
     env.locale.value = 'zh-CN'
     env.locale.dispatch('change')
 
     assert.strictEqual(inputTitle.textContent, 'Markdown 源文')
+    assert.strictEqual(layoutLabel.textContent, '布局')
     assert.strictEqual(globalThis.document.documentElement.lang, 'zh-CN')
     assert.strictEqual(env.tablist.attributes['aria-label'], '输出视图')
     assert.include(env.input.value, '# Premark-It 演示')
     assert.strictEqual(env.meta.attributes.content, '一个运行在 GitHub Pages 上的演示页，用于展示这版完全兼容 markdown-it 的重写实现和额外的 prepare() 缓存层。')
+  })
+
+  it('enables dynamic layout mode in the workspace', async function () {
+    const env = createEnvironment()
+    const moduleUrl = pathToFileURL(path.resolve('demo/main.js')).href + `?test=${Date.now()}`
+
+    await import(moduleUrl)
+
+    env.layoutMode.value = 'dynamic'
+    env.layoutMode.dispatch('change')
+    await new Promise((resolve) => setTimeout(resolve, 0))
+
+    assert.include(env.workspace.className, 'workspace-dynamic-mode')
+    assert.include(env.preview.className, 'rendered-view-dynamic-mode')
+    assert.include(env.preview.innerHTML, 'dynamic-stage')
   })
 })
