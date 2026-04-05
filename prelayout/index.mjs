@@ -6,6 +6,10 @@ const NUMERIC_RE = /[\p{N}%$¥€£.,/:+-]/u
 const URLISH_RE = /[A-Za-z0-9\-._~:/?#\[\]@!$&'()*+,;=%]/
 const OPENING_PUNCT_RE = /[([{"'“‘《「『〈〔【]/
 const CLOSING_PUNCT_RE = /[)\]}"'”’》」』〉〕】、。，．？！：；,.;!?]/
+const WORD_CONNECTOR_RE = /['’_-]/u
+const TRAILING_URL_PUNCT_RE = /[),.;!?]+$/
+const URL_TOKEN_RE = /(?:https?:\/\/|www\.)\S+/i
+const NUMERIC_TOKEN_RE = /\p{N}[\p{N}.,/:-]*\p{N}|\p{N}+/u
 const SEGMENTER_CACHE = new Map()
 const WIDTH_CACHE = new Map()
 const DOM_CORRECTION_CACHE = new Map()
@@ -108,12 +112,20 @@ function isWordish(char) {
   return WORDISH_RE.test(char)
 }
 
+function isWordConnector(char) {
+  return WORD_CONNECTOR_RE.test(char)
+}
+
 function isNumericLike(char) {
   return NUMERIC_RE.test(char)
 }
 
 function isUrlish(char) {
   return URLISH_RE.test(char)
+}
+
+function isDigitChar(char) {
+  return /\p{N}/u.test(char)
 }
 
 function isRTL(char) {
@@ -130,6 +142,33 @@ function isOpeningPunctuation(char) {
 
 function isClosingPunctuation(char) {
   return CLOSING_PUNCT_RE.test(char)
+}
+
+function isPunctuationLike(char) {
+  return (
+    !isWordish(char) &&
+    !isSpaceLike(char) &&
+    !isCJK(char) &&
+    char !== '\n' &&
+    char !== '\r' &&
+    char !== '\t' &&
+    char !== '\u00ad' &&
+    char !== '\u200b'
+  )
+}
+
+function splitWordSegments(text, locale) {
+  const segmenter = getSegmenter(locale, 'word')
+  if (!segmenter) {
+    return [text]
+  }
+
+  const segments = Array.from(segmenter.segment(text), (entry) => ({
+    text: entry.segment,
+    isWordLike: Boolean(entry.isWordLike)
+  }))
+
+  return segments.length > 0 ? segments : [{ text, isWordLike: true }]
 }
 
 function createCanvasContext() {
@@ -299,6 +338,180 @@ function bidiLevelForSegment(segment) {
   return RTL_RE.test(text) ? 1 : 0
 }
 
+function pushTextUnit(units, text, segmentIndex, styleIndex, segment, analysisKind) {
+  if (!text) return
+
+  const graphemes = splitGraphemes(text)
+  const bidiLevel = bidiLevelForSegment(segment)
+  const isCjkKind = analysisKind === 'cjk'
+  const isWordKind = analysisKind === 'word'
+  const isNumericKind = analysisKind === 'numeric'
+  const isUrlKind = analysisKind === 'url'
+  const isOpeningKind = analysisKind === 'openingPunct'
+  const isClosingKind = analysisKind === 'closingPunct'
+
+  units.push({
+    kind: 'text',
+    text,
+    segmentIndex,
+    styleIndex,
+    bidiLevel,
+    analysisKind,
+    isWhitespace: false,
+    isWordish: isWordKind || graphemes.every((grapheme) => isWordish(grapheme) || isWordConnector(grapheme)),
+    isNumeric: isNumericKind,
+    isUrlish: isUrlKind,
+    isRTL: graphemes.some((grapheme) => isRTL(grapheme)),
+    isCJK: isCjkKind || graphemes.every((grapheme) => isCJK(grapheme)),
+    isOpeningPunctuation: isOpeningKind || graphemes.every((grapheme) => isOpeningPunctuation(grapheme)),
+    isClosingPunctuation: isClosingKind || graphemes.every((grapheme) => isClosingPunctuation(grapheme))
+  })
+}
+
+function stripTrailingUrlPunctuation(text) {
+  const match = TRAILING_URL_PUNCT_RE.exec(text)
+  if (!match) {
+    return { url: text, trailing: '' }
+  }
+
+  const trailing = match[0]
+  return {
+    url: text.slice(0, -trailing.length),
+    trailing
+  }
+}
+
+function isUrlLikeText(text) {
+  return /^(?:https?:\/\/|www\.)\S+$/i.test(text)
+}
+
+function classifyTextPiece(piece) {
+  const graphemes = splitGraphemes(piece)
+  if (graphemes.length === 0) return null
+
+  if (isUrlLikeText(piece)) return 'url'
+  if (graphemes.every((grapheme) => isCJK(grapheme))) return 'cjk'
+  if (graphemes.every((grapheme) => isDigitChar(grapheme) || isNumericLike(grapheme)) && graphemes.some((grapheme) => isDigitChar(grapheme))) {
+    return 'numeric'
+  }
+  if (graphemes.every((grapheme) => isWordish(grapheme) || isWordConnector(grapheme))) return 'word'
+  if (graphemes.every((grapheme) => isOpeningPunctuation(grapheme))) return 'openingPunct'
+  if (graphemes.every((grapheme) => isClosingPunctuation(grapheme))) return 'closingPunct'
+  if (graphemes.every((grapheme) => isPunctuationLike(grapheme))) return 'punct'
+  return 'mixed'
+}
+
+function fallbackChunkScan(text, segmentIndex, styleIndex, segment, units) {
+  const graphemes = splitGraphemes(text)
+
+  for (let index = 0; index < graphemes.length;) {
+    const current = graphemes[index]
+
+    if (isCJK(current)) {
+      pushTextUnit(units, current, segmentIndex, styleIndex, segment, 'cjk')
+      index += 1
+      continue
+    }
+
+    if (isDigitChar(current)) {
+      let nextIndex = index + 1
+      while (nextIndex < graphemes.length && (isDigitChar(graphemes[nextIndex]) || isNumericLike(graphemes[nextIndex]))) {
+        nextIndex += 1
+      }
+      pushTextUnit(units, graphemes.slice(index, nextIndex).join(''), segmentIndex, styleIndex, segment, 'numeric')
+      index = nextIndex
+      continue
+    }
+
+    if (isWordish(current) || isWordConnector(current) || isRTL(current)) {
+      let nextIndex = index + 1
+      while (
+        nextIndex < graphemes.length &&
+        (isWordish(graphemes[nextIndex]) || isWordConnector(graphemes[nextIndex]) || isRTL(graphemes[nextIndex]))
+      ) {
+        nextIndex += 1
+      }
+      pushTextUnit(units, graphemes.slice(index, nextIndex).join(''), segmentIndex, styleIndex, segment, 'word')
+      index = nextIndex
+      continue
+    }
+
+    let nextIndex = index + 1
+    while (nextIndex < graphemes.length && isPunctuationLike(graphemes[nextIndex])) {
+      nextIndex += 1
+    }
+    const punct = graphemes.slice(index, nextIndex).join('')
+    pushTextUnit(units, punct, segmentIndex, styleIndex, segment, classifyTextPiece(punct) || 'punct')
+    index = nextIndex
+  }
+}
+
+function appendNonUrlUnits(text, segmentIndex, styleIndex, segment, locale, units) {
+  if (!text) {
+    return
+  }
+  const wordSegments = splitWordSegments(text, locale)
+  for (const entry of wordSegments) {
+    const piece = entry.text
+    if (!piece) continue
+
+    const analysisKind = classifyTextPiece(piece)
+    if (analysisKind === 'mixed') {
+      fallbackChunkScan(piece, segmentIndex, styleIndex, segment, units)
+      continue
+    }
+
+    if (analysisKind === 'cjk') {
+      for (const grapheme of splitGraphemes(piece, locale)) {
+        pushTextUnit(units, grapheme, segmentIndex, styleIndex, segment, 'cjk')
+      }
+      continue
+    }
+
+    pushTextUnit(units, piece, segmentIndex, styleIndex, segment, analysisKind || 'word')
+  }
+}
+
+function chunkToUnits(text, segmentIndex, styleIndex, segment, locale, units) {
+  if (!text) return
+
+  let remaining = text
+  while (remaining.length > 0) {
+    const nextUrlIndex = remaining.search(URL_TOKEN_RE)
+    const nextNumericIndex = remaining.search(NUMERIC_TOKEN_RE)
+    const candidateIndexes = [nextUrlIndex, nextNumericIndex].filter((value) => value >= 0)
+    const nextSpecialIndex = candidateIndexes.length > 0 ? Math.min(...candidateIndexes) : -1
+
+    if (nextSpecialIndex === -1) {
+      appendNonUrlUnits(remaining, segmentIndex, styleIndex, segment, locale, units)
+      break
+    }
+
+    if (nextSpecialIndex > 0) {
+      appendNonUrlUnits(remaining.slice(0, nextSpecialIndex), segmentIndex, styleIndex, segment, locale, units)
+      remaining = remaining.slice(nextSpecialIndex)
+      continue
+    }
+
+    if (nextUrlIndex === 0) {
+      const match = URL_TOKEN_RE.exec(remaining)
+      const rawUrl = match?.[0] || ''
+      const { url, trailing } = stripTrailingUrlPunctuation(rawUrl)
+      pushTextUnit(units, url, segmentIndex, styleIndex, segment, 'url')
+      if (trailing) {
+        pushTextUnit(units, trailing, segmentIndex, styleIndex, segment, classifyTextPiece(trailing) || 'punct')
+      }
+      remaining = remaining.slice(rawUrl.length)
+      continue
+    }
+
+    const numericMatch = NUMERIC_TOKEN_RE.exec(remaining)
+    const numericText = numericMatch?.[0] || ''
+    pushTextUnit(units, numericText, segmentIndex, styleIndex, segment, 'numeric')
+    remaining = remaining.slice(numericText.length)
+  }
+}
+
 function pushCollapsibleSpace(units, segmentIndex, segment, styleIndex) {
   const previous = units[units.length - 1]
   if (previous?.kind === 'space') {
@@ -322,11 +535,19 @@ function segmentToUnits(segment, segmentIndex, styleIndex, style, locale) {
   const graphemes = splitGraphemes(segment.text || '', locale)
   const preserveSpaces = style.whiteSpace === 'pre-wrap'
   let pendingCollapsedSpace = false
+  let pendingTextChunk = ''
 
   const flushCollapsedSpace = () => {
     if (!pendingCollapsedSpace) return
+    flushTextChunk()
     pushCollapsibleSpace(units, segmentIndex, segment, styleIndex)
     pendingCollapsedSpace = false
+  }
+
+  const flushTextChunk = () => {
+    if (!pendingTextChunk) return
+    chunkToUnits(pendingTextChunk, segmentIndex, styleIndex, segment, locale, units)
+    pendingTextChunk = ''
   }
 
   for (const grapheme of graphemes) {
@@ -336,6 +557,7 @@ function segmentToUnits(segment, segmentIndex, styleIndex, style, locale) {
 
     if (grapheme === '\n') {
       flushCollapsedSpace()
+      flushTextChunk()
       units.push({
         kind: 'hardbreak',
         text: '\n',
@@ -354,6 +576,7 @@ function segmentToUnits(segment, segmentIndex, styleIndex, style, locale) {
       }
 
       flushCollapsedSpace()
+      flushTextChunk()
       units.push({
         kind: 'tab',
         text: grapheme,
@@ -368,6 +591,7 @@ function segmentToUnits(segment, segmentIndex, styleIndex, style, locale) {
 
     if (grapheme === '\u00ad') {
       flushCollapsedSpace()
+      flushTextChunk()
       units.push({
         kind: 'softHyphen',
         text: grapheme,
@@ -380,6 +604,7 @@ function segmentToUnits(segment, segmentIndex, styleIndex, style, locale) {
 
     if (grapheme === '\u200b') {
       flushCollapsedSpace()
+      flushTextChunk()
       units.push({
         kind: 'zwsp',
         text: grapheme,
@@ -394,6 +619,7 @@ function segmentToUnits(segment, segmentIndex, styleIndex, style, locale) {
     if (isSpaceLike(grapheme)) {
       if (preserveSpaces) {
         flushCollapsedSpace()
+        flushTextChunk()
         units.push({
           kind: 'space',
           text: grapheme,
@@ -410,25 +636,11 @@ function segmentToUnits(segment, segmentIndex, styleIndex, style, locale) {
     }
 
     flushCollapsedSpace()
-
-    units.push({
-      kind: 'text',
-      text: grapheme,
-      segmentIndex,
-      styleIndex,
-      bidiLevel: bidiLevelForSegment(segment),
-      isWhitespace: false,
-      isWordish: isWordish(grapheme),
-      isNumeric: isNumericLike(grapheme),
-      isUrlish: isUrlish(grapheme),
-      isRTL: isRTL(grapheme),
-      isCJK: isCJK(grapheme),
-      isOpeningPunctuation: isOpeningPunctuation(grapheme),
-      isClosingPunctuation: isClosingPunctuation(grapheme)
-    })
+    pendingTextChunk += grapheme
   }
 
   flushCollapsedSpace()
+  flushTextChunk()
 
   return units
 }
@@ -453,6 +665,10 @@ function shouldGlueUnits(current, next, profile, keepAll) {
       return true
     }
     return false
+  }
+
+  if (current.analysisKind === 'url' || next.analysisKind === 'url') {
+    return current.analysisKind === 'url' && next.analysisKind === 'url'
   }
 
   if ((current.isWordish && next.isWordish) || (current.isNumeric && next.isNumeric)) {
@@ -604,6 +820,30 @@ function computeBreakablePrefixWidths(units, fitPrefix) {
   return prefixWidths
 }
 
+function computeLineEndAdvances(units, fitPrefix, paintPrefix) {
+  const lineEndFitAdvances = new Array(units.length).fill(null)
+  const lineEndPaintAdvances = new Array(units.length).fill(null)
+
+  for (let index = 0; index < units.length; index += 1) {
+    const unit = units[index]
+    if (!unit.breakAfter) continue
+
+    let visibleEnd = index + 1
+    while (visibleEnd > 0 && units[visibleEnd - 1]?.isDiscardableAtLineEnd) {
+      visibleEnd -= 1
+    }
+
+    lineEndFitAdvances[index] = fitPrefix[visibleEnd]
+    lineEndPaintAdvances[index] =
+      paintPrefix[visibleEnd] + (unit.kind === 'softHyphen' ? unit.paintAdvance || 0 : 0)
+  }
+
+  return {
+    lineEndFitAdvances,
+    lineEndPaintAdvances
+  }
+}
+
 function buildPrepared(normalizedSegments, preparedStyle, options) {
   const profile = detectEngineProfile()
   const styleProfiles = normalizedSegments
@@ -617,6 +857,7 @@ function buildPrepared(normalizedSegments, preparedStyle, options) {
   const { chunks, breakKinds } = analyzeUnits(units, preparedStyle, profile, styleProfiles)
   const measured = enrichMeasurements(units, styleProfiles, preparedStyle, options, profile)
   const breakablePrefixWidths = computeBreakablePrefixWidths(units, measured.fitPrefix)
+  const lineEndAdvances = computeLineEndAdvances(units, measured.fitPrefix, measured.paintPrefix)
   const normalizedText = normalizedSegments
     .map((segment) => segment.kind === 'hardbreak' ? '\n' : segment.text)
     .join('')
@@ -631,6 +872,8 @@ function buildPrepared(normalizedSegments, preparedStyle, options) {
     fitAdvances: measured.fitAdvances,
     paintAdvances: measured.paintAdvances,
     breakablePrefixWidths,
+    lineEndFitAdvances: lineEndAdvances.lineEndFitAdvances,
+    lineEndPaintAdvances: lineEndAdvances.lineEndPaintAdvances,
     styleProfileId: `${profile.id}:${fontKey(preparedStyle)}`,
     segLevels: normalizedSegments.map(bidiLevelForSegment),
     measurementMetadata: {
@@ -745,6 +988,87 @@ function resolveLineSlot(prepared, cursor, geometry, options = {}) {
   }
 }
 
+function breakPenalty(unit, profile) {
+  switch (unit.kind) {
+    case 'space':
+      return 0
+    case 'tab':
+      return 1
+    case 'softHyphen':
+      return profile.preferEarlySoftHyphenBreak ? 1 : 3
+    case 'zwsp':
+      return 2
+    case 'text':
+      if (unit.breakKind === 'cjk') return 2
+      if (unit.analysisKind === 'closingPunct') return 3
+      if (unit.analysisKind === 'openingPunct') return 4
+      return 5
+    default:
+      return 6
+  }
+}
+
+function candidateFitWidth(prepared, start, index, profile) {
+  const endConsumed = index + 1
+  const preferred = prepared.lineEndFitAdvances?.[index]
+  if (profile.preferPrefixWidthsForBreakableRuns && preferred != null) {
+    return preferred - prepared.fitPrefix[start]
+  }
+  return prepared.fitPrefix[endConsumed] - prepared.fitPrefix[start]
+}
+
+function candidatePaintWidth(prepared, start, index, profile) {
+  const endConsumed = index + 1
+  const preferred = prepared.lineEndPaintAdvances?.[index]
+  if (profile.preferPrefixWidthsForBreakableRuns && preferred != null) {
+    return preferred - prepared.paintPrefix[start]
+  }
+
+  const unit = prepared.units[index]
+  const endVisible = trimLineEnd(prepared, start, endConsumed)
+  return linePaintWidth(prepared, start, endVisible, unit.kind === 'softHyphen', unit.paintAdvance || 0)
+}
+
+function selectPreferredBreak(currentBest, nextCandidate, profile) {
+  if (!currentBest) {
+    return nextCandidate
+  }
+
+  if (nextCandidate.endConsumed > currentBest.endConsumed) {
+    if (
+      profile.preferEarlySoftHyphenBreak &&
+      currentBest.unit.kind !== 'softHyphen' &&
+      nextCandidate.unit.kind === 'softHyphen' &&
+      currentBest.fitWidth - nextCandidate.fitWidth <= (nextCandidate.unit.paintAdvance || 0) * 1.4
+    ) {
+      return nextCandidate
+    }
+    return nextCandidate
+  }
+
+  if (nextCandidate.endConsumed < currentBest.endConsumed) {
+    if (
+      profile.preferEarlySoftHyphenBreak &&
+      nextCandidate.unit.kind === 'softHyphen' &&
+      currentBest.unit.kind !== 'softHyphen' &&
+      currentBest.fitWidth - nextCandidate.fitWidth <= (nextCandidate.unit.paintAdvance || 0) * 1.4
+    ) {
+      return nextCandidate
+    }
+    return currentBest
+  }
+
+  if (nextCandidate.penalty < currentBest.penalty) {
+    return nextCandidate
+  }
+
+  if (nextCandidate.penalty === currentBest.penalty && nextCandidate.paintWidth > currentBest.paintWidth) {
+    return nextCandidate
+  }
+
+  return currentBest
+}
+
 function skipLeadingCollapsible(prepared, start) {
   let index = start
   if (prepared.baseStyle.whiteSpace === 'pre-wrap') {
@@ -787,7 +1111,7 @@ export function layoutNextLine(prepared, cursor = { index: 0, y: 0, lineNumber: 
 
   let index = start
   let currentWidth = 0
-  let lastBreak = null
+  let bestBreak = null
   const epsilon = prepared.engineProfile.lineFitEpsilon
 
   while (index < prepared.units.length) {
@@ -807,20 +1131,20 @@ export function layoutNextLine(prepared, cursor = { index: 0, y: 0, lineNumber: 
 
     const nextWidth = currentWidth + unit.fitAdvance
     if (nextWidth > slot.width + epsilon) {
-      if (lastBreak && lastBreak.endConsumed > start) {
+      if (bestBreak && bestBreak.endConsumed > start) {
         const line = buildLineRecord(
           prepared,
           start,
-          lastBreak.endConsumed,
+          bestBreak.endConsumed,
           slot.y,
           slot,
           cursor.lineNumber || 0,
-          lastBreak.appendHyphen
+          bestBreak.appendHyphen
         )
         return {
           line,
           nextCursor: {
-            index: lastBreak.endConsumed,
+            index: bestBreak.endConsumed,
             y: slot.y + slot.lineHeight,
             lineNumber: (cursor.lineNumber || 0) + 1
           }
@@ -841,17 +1165,24 @@ export function layoutNextLine(prepared, cursor = { index: 0, y: 0, lineNumber: 
 
     currentWidth = nextWidth
     if (unit.breakAfter) {
-      lastBreak = {
+      const candidate = {
         endConsumed: index + 1,
-        appendHyphen: unit.kind === 'softHyphen'
+        appendHyphen: unit.kind === 'softHyphen',
+        fitWidth: candidateFitWidth(prepared, start, index, prepared.engineProfile),
+        paintWidth: candidatePaintWidth(prepared, start, index, prepared.engineProfile),
+        penalty: breakPenalty(unit, prepared.engineProfile),
+        unit
+      }
+      if (candidate.fitWidth <= slot.width + epsilon) {
+        bestBreak = selectPreferredBreak(bestBreak, candidate, prepared.engineProfile)
       }
     }
 
     index += 1
   }
 
-  const finalEnd = lastBreak?.endConsumed || index
-  const line = buildLineRecord(prepared, start, finalEnd, slot.y, slot, cursor.lineNumber || 0, lastBreak?.appendHyphen || false)
+  const finalEnd = bestBreak?.endConsumed || index
+  const line = buildLineRecord(prepared, start, finalEnd, slot.y, slot, cursor.lineNumber || 0, bestBreak?.appendHyphen || false)
   return {
     line,
     nextCursor: {

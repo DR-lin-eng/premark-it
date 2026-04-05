@@ -190,6 +190,8 @@ The best demos don't just show a parser. They show how reading can feel editoria
 
 Paragraphs should be allowed to wrap into calmer columns, while supporting content finds its own lane.
 
+> A second note should be able to occupy the opposite rail without collapsing the main reading rhythm.
+
 ## Snapshot
 
 | Element | Treatment |
@@ -394,6 +396,8 @@ console.log(md.render(prepared));
 - 侧栏内容会让引用和图片更从容。
 
 正文应该能获得更舒展的行宽，而补充内容则进入自己的叙事轨道。
+
+> 第二个注释块应该可以进入另一侧 rail，而不打断正文的阅读节奏。
 
 ## 版式快照
 

@@ -664,8 +664,8 @@ async function prepareSemanticBlock(block, locale) {
 }
 
 function decorateLayoutHints(blocks) {
-  let firstQuoteAssigned = false
-  let firstImageAssigned = false
+  let quoteCount = 0
+  let imageCount = 0
 
   return blocks.map((block) => {
     if (block.kind === 'heading') {
@@ -676,14 +676,30 @@ function decorateLayoutHints(blocks) {
       return { ...block, placementHint: 'full' }
     }
 
-    if (block.kind === 'quote' && !firstQuoteAssigned) {
-      firstQuoteAssigned = true
-      return { ...block, placementHint: 'rail', variant: 'note' }
+    if (block.kind === 'quote') {
+      quoteCount += 1
+      if (quoteCount <= 2) {
+        return {
+          ...block,
+          placementHint: 'rail',
+          variant: 'note',
+          railSide: quoteCount % 2 === 1 ? 'left' : 'right'
+        }
+      }
+      return { ...block, placementHint: 'full', variant: 'note' }
     }
 
-    if (block.kind === 'image' && !firstImageAssigned) {
-      firstImageAssigned = true
-      return { ...block, placementHint: 'rail', variant: 'figure' }
+    if (block.kind === 'image') {
+      imageCount += 1
+      if (imageCount <= 2) {
+        return {
+          ...block,
+          placementHint: 'rail',
+          variant: 'figure',
+          railSide: imageCount % 2 === 1 ? 'right' : 'left'
+        }
+      }
+      return { ...block, placementHint: 'full', variant: 'figure' }
     }
 
     if (block.kind === 'code' || block.kind === 'table' || block.kind === 'html') {
@@ -1043,6 +1059,18 @@ function renderHtmlBlock(block) {
   }
 }
 
+function renderSectionBreak(label = '') {
+  return {
+    height: 56,
+    html: `
+      <div class="section-break">
+        <span class="section-break-line"></span>
+        ${label ? `<span class="section-break-label">${escapeHtml(label)}</span>` : ''}
+      </div>
+    `
+  }
+}
+
 function renderRailNoteBlock(block, width) {
   const rendered = renderTextBlock(block, Math.max(220, width - 28))
   return {
@@ -1055,7 +1083,8 @@ function blockClassName(block) {
   return [
     'stage-item',
     `stage-item-${block.kind}`,
-    block.variant ? `stage-item-${block.variant}` : ''
+    block.variant ? `stage-item-${block.variant}` : '',
+    block.railSide ? `stage-item-rail-${block.railSide}` : ''
   ]
     .filter(Boolean)
     .join(' ')
@@ -1089,24 +1118,72 @@ function narrativeSpacingFor(block, nextBlock) {
   return 14
 }
 
+function activeObstacleIntervals(obstacles, y, lineHeight, totalWidth, gutter) {
+  const active = obstacles.filter((obstacle) => y < obstacle.bottom && y + lineHeight > obstacle.top)
+  if (active.length === 0) {
+    return [{ left: 0, right: totalWidth }]
+  }
+
+  const blocked = active
+    .map((obstacle) => ({
+      left: Math.max(0, obstacle.left - gutter),
+      right: Math.min(totalWidth, obstacle.right + gutter)
+    }))
+    .sort((left, right) => left.left - right.left)
+
+  const merged = []
+  for (const interval of blocked) {
+    const previous = merged[merged.length - 1]
+    if (!previous || interval.left > previous.right) {
+      merged.push({ ...interval })
+      continue
+    }
+    previous.right = Math.max(previous.right, interval.right)
+  }
+
+  const slots = []
+  let cursor = 0
+  for (const interval of merged) {
+    if (interval.left > cursor) {
+      slots.push({ left: cursor, right: interval.left })
+    }
+    cursor = Math.max(cursor, interval.right)
+  }
+
+  if (cursor < totalWidth) {
+    slots.push({ left: cursor, right: totalWidth })
+  }
+
+  return slots.filter((slot) => slot.right - slot.left >= 180)
+}
+
 function createObstacleGeometry(totalWidth, obstacles, gutter = 24) {
   const ordered = [...obstacles].sort((left, right) => left.top - right.top)
   return {
     resolveLine(y, lineHeight) {
-      const active = ordered.find((obstacle) => y < obstacle.bottom && y + lineHeight > obstacle.top)
-      if (!active) {
+      const intervals = activeObstacleIntervals(ordered, y, lineHeight, totalWidth, gutter)
+      if (intervals.length === 0) {
+        return null
+      }
+
+      if (intervals.length === 1) {
+        const only = intervals[0]
         return {
-          x: 0,
+          x: only.left,
           y,
-          width: totalWidth,
+          width: only.right - only.left,
           column: 'main'
         }
       }
 
+      const widest = intervals.reduce((best, interval) => {
+        return interval.right - interval.left > best.right - best.left ? interval : best
+      })
+
       return {
-        x: 0,
+        x: widest.left,
         y,
-        width: Math.max(220, active.x - gutter),
+        width: widest.right - widest.left,
         column: 'main'
       }
     }
@@ -1166,15 +1243,19 @@ export function composeDynamicLayout(preparedDynamicDocument, metrics) {
 
   const items = []
   let currentY = 0
-  let sideY = 0
+  let leftRailY = 0
+  let rightRailY = 0
   const pendingNarrative = []
   const pendingObstacles = []
+
+  const railMaxY = () => Math.max(leftRailY, rightRailY)
 
   const flushNarrative = () => {
     if (pendingNarrative.length === 0) {
       if (pendingObstacles.length > 0) {
         currentY = Math.max(currentY, ...pendingObstacles.map((obstacle) => obstacle.bottom)) + 28
-        sideY = currentY
+        leftRailY = currentY
+        rightRailY = currentY
         pendingObstacles.length = 0
       }
       return
@@ -1198,37 +1279,69 @@ export function composeDynamicLayout(preparedDynamicDocument, metrics) {
     })
 
     currentY = rendered.endY + 30
-    sideY = Math.max(sideY, ...pendingObstacles.map((obstacle) => obstacle.bottom), currentY)
+    leftRailY = Math.max(leftRailY, ...pendingObstacles.map((obstacle) => obstacle.bottom), currentY)
+    rightRailY = Math.max(rightRailY, ...pendingObstacles.map((obstacle) => obstacle.bottom), currentY)
     pendingObstacles.length = 0
   }
 
   const placeFull = (block, rendered, width = metrics.previewWidth) => {
     flushNarrative()
-    const y = Math.max(currentY, sideY)
+    const y = Math.max(currentY, railMaxY())
     items.push(createStageItem(block, 0, y, width, rendered, 'stage-item-full'))
     const synced = syncColumns(y + rendered.height + 30)
     currentY = synced.mainY
-    sideY = synced.sideY
+    leftRailY = synced.sideY
+    rightRailY = synced.sideY
+  }
+
+  const placeSectionBreak = (label) => {
+    flushNarrative()
+    const rendered = renderSectionBreak(label)
+    const y = Math.max(currentY, railMaxY())
+    items.push({
+      key: `section-break:${Math.round(y)}:${label}`,
+      x: 0,
+      y,
+      width: metrics.previewWidth,
+      height: rendered.height,
+      className: 'stage-item stage-item-section-break',
+      html: rendered.html
+    })
+    currentY = y + rendered.height + 18
+    leftRailY = currentY
+    rightRailY = currentY
   }
 
   const placeRail = (block, rendered) => {
+    const railSide = block.railSide || 'right'
+    const x = railSide === 'left' ? 0 : metrics.sideX
+    const yBase = railSide === 'left' ? leftRailY : rightRailY
     const top = pendingObstacles.length === 0
       ? currentY + 16
-      : Math.max(sideY + 24, currentY + 160)
+      : Math.max(yBase + 24, currentY + 160)
     const obstacle = {
       top,
       bottom: top + rendered.height,
-      x: metrics.sideX,
+      left: x,
+      right: x + metrics.sideWidth,
       width: metrics.sideWidth
     }
     pendingObstacles.push(obstacle)
-    items.push(createStageItem(block, obstacle.x, obstacle.top, metrics.sideWidth, rendered, 'stage-item-rail'))
-    sideY = obstacle.bottom
+    items.push(createStageItem(block, x, obstacle.top, metrics.sideWidth, rendered, `stage-item-rail stage-item-rail-${railSide}`))
+    if (railSide === 'left') {
+      leftRailY = obstacle.bottom
+    } else {
+      rightRailY = obstacle.bottom
+    }
   }
 
   for (const block of preparedDynamicDocument.blocks) {
     switch (block.kind) {
       case 'heading': {
+        if (block.depth === 1 && items.length > 0) {
+          const labelSegment = block.segments?.find((segment) => segment.text)?.text || ''
+          placeSectionBreak(labelSegment)
+        }
         const rendered = renderTextBlock(block, metrics.wide ? Math.min(metrics.previewWidth, 980) : metrics.previewWidth)
         placeFull(block, rendered)
         break
@@ -1289,7 +1402,7 @@ export function composeDynamicLayout(preparedDynamicDocument, metrics) {
   flushNarrative()
 
   const result = {
-    height: Math.max(currentY, sideY),
+    height: Math.max(currentY, railMaxY()),
     items
   }
 

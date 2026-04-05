@@ -84,6 +84,13 @@ describe('prelayout experimental API', function () {
     restoreEnvironment?.()
   })
 
+  function setUserAgent(userAgent) {
+    Object.defineProperty(globalThis, 'navigator', {
+      configurable: true,
+      value: { userAgent }
+    })
+  }
+
   it('prepares width-independent IR and lays out text at different widths', async function () {
     const {
       prepareText,
@@ -164,5 +171,154 @@ describe('prelayout experimental API', function () {
     assert.isNotNull(first)
     assert.isTrue(first.line.appendHyphen)
     assert.include(first.line.text, '-')
+  })
+
+  it('classifies url-like and numeric runs as stable units', async function () {
+    const {
+      prepareText
+    } = await import(`../prelayout/index.mjs?test=${Date.now()}-runs`)
+
+    const prepared = prepareText(
+      'Visit https://github.com/chenglou/pretext?id=1, then compare 2026/04/05 against 3.1415.',
+      {
+        fontFamily: 'Georgia, serif',
+        fontSize: 18,
+        lineHeight: 30
+      }
+    )
+
+    const urlUnit = prepared.units.find((unit) => unit.analysisKind === 'url')
+    const numericUnits = prepared.units.filter((unit) => unit.analysisKind === 'numeric')
+
+    assert.exists(urlUnit)
+    assert.strictEqual(urlUnit.text, 'https://github.com/chenglou/pretext?id=1')
+    assert.includeMembers(numericUnits.map((unit) => unit.text), ['2026/04/05', '3.1415'])
+  })
+
+  it('keeps mixed script and punctuation metadata on prepared units', async function () {
+    const {
+      prepareText
+    } = await import(`../prelayout/index.mjs?test=${Date.now()}-mixed`)
+
+    const prepared = prepareText(
+      '中文 English，“quoted” مرحبا',
+      {
+        fontFamily: 'Georgia, serif',
+        fontSize: 18,
+        lineHeight: 30
+      }
+    )
+
+    assert.isTrue(prepared.units.some((unit) => unit.analysisKind === 'cjk'))
+    assert.isTrue(prepared.units.some((unit) => unit.analysisKind === 'word'))
+    assert.isTrue(prepared.units.some((unit) => unit.analysisKind === 'openingPunct'))
+    assert.isTrue(prepared.units.some((unit) => unit.analysisKind === 'closingPunct'))
+    assert.isTrue(prepared.units.some((unit) => unit.bidiLevel === 1))
+  })
+
+  it('records line-end fit and paint advances for breakable positions', async function () {
+    const {
+      prepareText
+    } = await import(`../prelayout/index.mjs?test=${Date.now()}-line-end`)
+
+    const prepared = prepareText('alpha beta\u00adgamma', {
+      fontFamily: 'Georgia, serif',
+      fontSize: 18,
+      lineHeight: 30
+    })
+
+    const breakableIndexes = prepared.breakKinds
+      .map((kind, index) => [kind, index])
+      .filter(([kind]) => kind !== 'none')
+      .map(([, index]) => index)
+
+    assert.isAtLeast(breakableIndexes.length, 2)
+    breakableIndexes.forEach((index) => {
+      assert.isNotNull(prepared.lineEndFitAdvances[index])
+      assert.isNotNull(prepared.lineEndPaintAdvances[index])
+    })
+  })
+
+  it('keeps opening and closing punctuation attached to the quoted run', async function () {
+    const {
+      prepareText,
+      layoutNextLine
+    } = await import(`../prelayout/index.mjs?test=${Date.now()}-quotes`)
+
+    const prepared = prepareText('Hello “world” again', {
+      fontFamily: 'Georgia, serif',
+      fontSize: 18,
+      lineHeight: 30
+    })
+
+    const first = layoutNextLine(prepared, { index: 0, y: 0, lineNumber: 0 }, 56)
+    const second = layoutNextLine(prepared, first.nextCursor, 80)
+
+    assert.strictEqual(first.line.text.trim(), 'Hello')
+    assert.include(second.line.text, '“world”')
+  })
+
+  it('honors keepAll for continuous CJK text', async function () {
+    const {
+      prepareText
+    } = await import(`../prelayout/index.mjs?test=${Date.now()}-keep-all`)
+
+    const source = '这是一个连续中文段落用于测试断行行为'
+    const defaultPrepared = prepareText(source, {
+      fontFamily: 'Georgia, serif',
+      fontSize: 18,
+      lineHeight: 30
+    })
+    const keepAllPrepared = prepareText(source, {
+      fontFamily: 'Georgia, serif',
+      fontSize: 18,
+      lineHeight: 30,
+      keepAll: true
+    })
+
+    const defaultBreaks = defaultPrepared.breakKinds.filter((kind) => kind !== 'none').length
+    const keepAllBreaks = keepAllPrepared.breakKinds.filter((kind) => kind !== 'none').length
+
+    assert.isAbove(defaultBreaks, keepAllBreaks)
+  })
+
+  it('preserves spaces and tabs under pre-wrap', async function () {
+    const {
+      prepareText,
+      layoutWithLines
+    } = await import(`../prelayout/index.mjs?test=${Date.now()}-pre-wrap`)
+
+    const prepared = prepareText('alpha    beta\tgamma', {
+      fontFamily: 'Georgia, serif',
+      fontSize: 18,
+      lineHeight: 30,
+      whiteSpace: 'pre-wrap',
+      tabSize: 2
+    })
+
+    const rendered = layoutWithLines(prepared, 400)
+
+    assert.include(rendered.lines[0].text, 'alpha    beta')
+    assert.include(rendered.lines[0].text, '  gamma')
+  })
+
+  it('prefers early soft hyphen breaks on firefox-like profiles', async function () {
+    setUserAgent('Mozilla/5.0 Firefox/124.0')
+    const {
+      prepareText,
+      layoutNextLine
+    } = await import(`../prelayout/index.mjs?test=${Date.now()}-firefox-soft`)
+
+    const prepared = prepareText('electro\u00admagnetic fields travel', {
+      fontFamily: 'Georgia, serif',
+      fontSize: 18,
+      lineHeight: 30
+    })
+
+    const first = layoutNextLine(prepared, { index: 0, y: 0, lineNumber: 0 }, 88)
+
+    assert.isTrue(first.line.appendHyphen)
+    assert.include(first.line.text, '-')
+    assert.strictEqual(prepared.engineProfile.id, 'firefox')
   })
 })

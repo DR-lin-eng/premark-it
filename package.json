@@ -6,6 +6,7 @@
   "main": "./index.mjs",
   "exports": {
     ".": "./index.mjs",
+    "./prelayout": "./prelayout/index.mjs",
     "./*": "./*"
   },
   "files": [
