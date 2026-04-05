@@ -100,6 +100,7 @@ function createEnvironment () {
 
   const input = register('#markdown-input', new StubNode({ id: 'markdown-input', tag: 'textarea' }))
   const workspace = register('.workspace', new StubNode({ className: 'workspace' }))
+  register('.output-panel', new StubNode({ className: 'output-panel panel' }))
   const handle = register('#workspace-handle', new StubNode({ id: 'workspace-handle' }))
   handle.setPointerCapture = function () {}
   const preview = register('#preview-view', new StubNode({ id: 'preview-view' }))
@@ -109,8 +110,16 @@ function createEnvironment () {
   register('#copy-html', new StubNode({ id: 'copy-html', tag: 'button' }))
   register('#mode-badge', new StubNode({ id: 'mode-badge', tag: 'span' }))
   register('#template-badge', new StubNode({ id: 'template-badge', tag: 'span' }))
+  register('#view-badge', new StubNode({ id: 'view-badge', tag: 'span' }))
+  register('#presentation-mode-badge', new StubNode({ id: 'presentation-mode-badge', tag: 'span' }))
+  register('#presentation-template-badge', new StubNode({ id: 'presentation-template-badge', tag: 'span' }))
+  register('#presentation-view-badge', new StubNode({ id: 'presentation-view-badge', tag: 'span' }))
+  register('.presentation-toolbar-label', new StubNode({ className: 'presentation-toolbar-label', tag: 'span' }))
+  register('#present-toolbar-exit', new StubNode({ id: 'present-toolbar-exit', tag: 'button' }))
   register('#output-summary', new StubNode({ id: 'output-summary', tag: 'p' }))
   register('#layout-status', new StubNode({ id: 'layout-status' }))
+  register('#copy-present-link', new StubNode({ id: 'copy-present-link', tag: 'button' }))
+  register('#present-toggle', new StubNode({ id: 'present-toggle', tag: 'button' }))
   register('#copy-status', new StubNode({ id: 'copy-status' }))
   register('#reset-sample', new StubNode({ id: 'reset-sample', tag: 'button' }))
   register('#view-caption', new StubNode({ id: 'view-caption', tag: 'p' }))
@@ -179,6 +188,7 @@ function createEnvironment () {
 
   globalThis.document = {
     documentElement: new StubNode({ tag: 'html' }),
+    body: new StubNode({ tag: 'body' }),
     title: '',
     querySelector (selector) {
       return selectors.get(selector) || null
@@ -221,6 +231,13 @@ function createEnvironment () {
     value: {
       innerWidth: 1440,
       innerHeight: 900,
+      location: {
+        href: 'https://example.com/demo',
+        search: ''
+      },
+      history: {
+        replaceState () {}
+      },
       requestAnimationFrame (callback) {
         return setTimeout(() => callback(Date.now()), 0)
       },
@@ -262,6 +279,10 @@ function createEnvironment () {
     }
   })
 
+  globalThis.document.documentElement.requestFullscreen = async function () {}
+  globalThis.document.exitFullscreen = async function () {}
+  globalThis.document.fullscreenElement = null
+
   const localStore = new Map()
   Object.defineProperty(globalThis, 'localStorage', {
     configurable: true,
@@ -287,7 +308,9 @@ function createEnvironment () {
     workspace,
     tablist,
     templateButtons,
-    dataI18nNodes
+    dataI18nNodes,
+    body: globalThis.document.body,
+    presentToggle: selectors.get('#present-toggle')
   }
 }
 
@@ -316,6 +339,7 @@ describe('Demo i18n and layout', function () {
     assert.strictEqual(env.tablist.attributes['aria-label'], '输出视图')
     assert.include(env.input.value, '# Premark-It 演示')
     assert.strictEqual(env.meta.attributes.content, '一个运行在 GitHub Pages 上的演示页，用于展示这版完全兼容 markdown-it 的重写实现和额外的 prepare() 缓存层。')
+    assert.strictEqual(env.presentToggle.textContent, '全屏预览')
   })
 
   it('enables dynamic layout mode in the workspace', async function () {
@@ -346,5 +370,9 @@ describe('Demo i18n and layout', function () {
     env.handle.dispatch('keydown', { key: 'ArrowRight' })
     await new Promise((resolve) => setTimeout(resolve, 0))
     assert.include(env.workspace.attributes.style, '--output-fr: 0.650fr')
+
+    env.presentToggle.dispatch('click')
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    assert.include(env.body.className, 'presentation-mode')
   })
 })

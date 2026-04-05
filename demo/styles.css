@@ -35,6 +35,55 @@ body {
     linear-gradient(180deg, #f5efe3 0%, #f2f4ec 100%);
 }
 
+body.presentation-mode {
+  background:
+    radial-gradient(circle at top left, rgba(14, 139, 116, 0.14), transparent 28%),
+    linear-gradient(180deg, #f4f0e6 0%, #f8faf5 100%);
+}
+
+.presentation-toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: none;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 18px;
+  background: rgba(255, 255, 255, 0.78);
+  border-bottom: 1px solid rgba(23, 33, 28, 0.1);
+  backdrop-filter: blur(18px);
+}
+
+body.presentation-mode .presentation-toolbar {
+  display: flex;
+}
+
+.presentation-toolbar-copy {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.presentation-toolbar-label {
+  font-size: 0.8rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.presentation-toolbar-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.presentation-toolbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
 button,
 input,
 select,
@@ -56,6 +105,11 @@ textarea {
   max-width: 1440px;
   margin: 0 auto;
   padding: 28px;
+}
+
+body.presentation-mode .page-shell {
+  max-width: 100%;
+  padding: 18px;
 }
 
 .hero {
@@ -343,10 +397,77 @@ textarea {
     background-color 180ms ease;
 }
 
+.template-card-visual {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+  min-height: 72px;
+  padding: 8px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.64);
+  border: 1px solid rgba(23, 33, 28, 0.08);
+}
+
+.visual-block {
+  display: block;
+  border-radius: 10px;
+  background: rgba(23, 33, 28, 0.08);
+}
+
+.visual-block-title {
+  grid-column: 1 / span 4;
+  height: 12px;
+  background: rgba(23, 33, 28, 0.2);
+}
+
+.visual-block-text {
+  grid-column: 1 / span 2;
+  height: 44px;
+}
+
+.visual-block-side {
+  grid-column: 3 / span 2;
+  height: 44px;
+  background: rgba(14, 139, 116, 0.18);
+}
+
+.visual-block-wide {
+  grid-column: 1 / span 4;
+  height: 18px;
+  background: rgba(255, 184, 77, 0.22);
+}
+
+.visual-block-quote {
+  grid-column: 1 / span 2;
+  height: 44px;
+  background: rgba(255, 184, 77, 0.18);
+}
+
+.visual-block-image {
+  grid-column: 3 / span 2;
+  height: 44px;
+  background: rgba(14, 139, 116, 0.2);
+}
+
+.visual-block-code {
+  grid-column: 1 / span 4;
+  height: 24px;
+  background: rgba(23, 33, 28, 0.74);
+}
+
 .template-card:hover {
   transform: translateY(-2px);
   border-color: rgba(14, 139, 116, 0.28);
   box-shadow: 0 12px 28px rgba(23, 33, 28, 0.08);
+}
+
+.template-card:focus-visible,
+.tab-button:focus-visible,
+.secondary-button:focus-visible,
+.primary-button:focus-visible,
+.workspace-handle:focus-visible {
+  outline: 3px solid rgba(14, 139, 116, 0.28);
+  outline-offset: 2px;
 }
 
 .template-card.is-active {
@@ -356,6 +477,18 @@ textarea {
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.88),
     0 14px 30px rgba(14, 139, 116, 0.08);
+}
+
+.template-card-visual-demo {
+  background: linear-gradient(180deg, rgba(14, 139, 116, 0.08), rgba(255, 255, 255, 0.72));
+}
+
+.template-card-visual-article {
+  background: linear-gradient(180deg, rgba(255, 184, 77, 0.12), rgba(255, 255, 255, 0.72));
+}
+
+.template-card-visual-docs {
+  background: linear-gradient(180deg, rgba(23, 33, 28, 0.06), rgba(255, 255, 255, 0.72));
 }
 
 .template-card-kicker {
@@ -475,6 +608,13 @@ textarea {
   line-height: 1.5;
 }
 
+.output-summary {
+  margin: 8px 0 0;
+  color: var(--ink);
+  font-size: 0.92rem;
+  line-height: 1.5;
+}
+
 .output-banner-copy {
   min-width: 0;
 }
@@ -489,6 +629,16 @@ textarea {
   border: 1px solid var(--line);
   border-radius: 16px;
   background: rgba(255, 255, 255, 0.56);
+}
+
+.output-banner-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.present-button {
+  white-space: nowrap;
 }
 
 .output-badge-group {
@@ -518,6 +668,13 @@ textarea {
   background: rgba(255, 184, 77, 0.16);
   border-color: rgba(255, 184, 77, 0.24);
   color: #7b4d00;
+}
+
+#view-badge,
+#presentation-view-badge {
+  background: rgba(23, 33, 28, 0.08);
+  border-color: rgba(23, 33, 28, 0.12);
+  color: var(--ink);
 }
 
 .stats-strip {
@@ -559,6 +716,45 @@ textarea {
   border-radius: 22px;
   padding: 22px;
   background: var(--panel-strong);
+  animation: view-fade-in 220ms ease;
+}
+
+body.presentation-mode .hero,
+body.presentation-mode .editor-panel,
+body.presentation-mode .workspace-handle,
+body.presentation-mode .footer-actions,
+body.presentation-mode .stats-strip {
+  display: none !important;
+}
+
+body.presentation-mode .workspace {
+  grid-template-columns: 1fr;
+}
+
+body.presentation-mode .output-panel {
+  min-height: calc(100vh - 36px);
+  padding: 18px 18px 24px;
+  border-radius: 28px;
+  background:
+    radial-gradient(circle at top right, rgba(255, 184, 77, 0.12), transparent 28%),
+    radial-gradient(circle at top left, rgba(14, 139, 116, 0.12), transparent 24%),
+    rgba(255, 252, 247, 0.92);
+}
+
+body.presentation-mode .output-banner {
+  margin-top: 10px;
+}
+
+body.presentation-mode .output-banner-actions {
+  justify-content: flex-end;
+}
+
+body.presentation-mode .view-card {
+  min-height: calc(100vh - 205px);
+  padding: 28px;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.92),
+    0 18px 40px rgba(23, 33, 28, 0.08);
 }
 
 .rendered-view {
@@ -591,6 +787,20 @@ textarea {
 .dynamic-stage {
   position: relative;
   isolation: isolate;
+  animation: stage-fade-in 260ms ease;
+}
+
+.output-panel[data-active-view="html"] .output-banner {
+  background: rgba(19, 32, 27, 0.08);
+}
+
+.output-panel[data-active-view="tokens"] .output-banner {
+  background: rgba(255, 184, 77, 0.12);
+}
+
+.output-panel[data-active-view="html"] #mode-badge,
+.output-panel[data-active-view="tokens"] #mode-badge {
+  background: rgba(255, 255, 255, 0.75);
 }
 
 .dynamic-card {
@@ -602,11 +812,23 @@ textarea {
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.85),
     0 16px 38px rgba(23, 33, 28, 0.1);
+  transition:
+    transform 260ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    opacity 220ms ease;
 }
 
 .dynamic-card-continuation {
   border-top-left-radius: 14px;
   border-top-right-radius: 14px;
+}
+
+.dynamic-card-entering {
+  opacity: 0;
+  transform: translateY(10px) scale(0.985);
+}
+
+.dynamic-card-animating {
+  will-change: transform;
 }
 
 .dynamic-card-inner {
@@ -938,7 +1160,11 @@ textarea {
 
   .panel-header,
   .footer-actions,
-  .output-banner {
+  .output-banner,
+  .output-banner-actions,
+  .presentation-toolbar,
+  .presentation-toolbar-copy,
+  .presentation-toolbar-actions {
     flex-direction: column;
     align-items: stretch;
   }
@@ -955,5 +1181,29 @@ textarea {
 
   to {
     transform: translateX(18%);
+  }
+}
+
+@keyframes view-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes stage-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.992);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
   }
 }

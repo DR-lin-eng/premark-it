@@ -999,6 +999,8 @@ export async function prepareDynamicDocumentFromSource({ source, md, cache }) {
       measuredBlock = prepareSemanticBlock(block, measurer)
     }
 
+    measuredBlock.cacheKey = signature
+
     cache?.blockCache?.set(signature, measuredBlock)
     measuredBlocks.push(measuredBlock)
   }
@@ -1106,6 +1108,32 @@ function renderMeasuredListItems(items, ordered, width, measurer, startIndex = 0
   }
 }
 
+function countWrappedCodeLines(code, availableWidth, measurer) {
+  const style = styleForBlock('code', {})
+  const rawLines = String(code).replace(/\n$/, '').split('\n')
+
+  return rawLines.reduce((total, rawLine) => {
+    if (rawLine.length === 0) {
+      return total + 1
+    }
+
+    const atom = {
+      type: 'word',
+      text: rawLine,
+      html: escapeHtml(rawLine),
+      styleState: {},
+      measuredStyle: style,
+      width: measurer.measureText(rawLine, style)
+    }
+
+    if (atom.width <= availableWidth) {
+      return total + 1
+    }
+
+    return total + splitLongAtom(atom, availableWidth, measurer).length
+  }, 0)
+}
+
 function estimateTableHeight(block, width, measurer) {
   const style = STYLE_PRESETS.table
   const columnCount = Math.max(block.headers.length, block.rows[0]?.length || 0, 1)
@@ -1158,8 +1186,13 @@ function renderDynamicBlock(block, width, measurer) {
     }
     case 'code': {
       const style = STYLE_PRESETS.code
-      const lines = String(block.code).replace(/\n$/, '').split('\n')
-      const height = style.cardPadding * 2 + Math.max(1, lines.length) * style.lineHeight + (block.lang ? 26 : 0)
+      const codeContentWidth = Math.max(120, width - style.cardPadding * 2 - 36)
+      const visualLineCount = Math.max(1, countWrappedCodeLines(block.code, codeContentWidth, measurer))
+      const height =
+        style.cardPadding * 2 +
+        36 +
+        visualLineCount * style.lineHeight +
+        (block.lang ? 38 : 0)
       const header = block.lang
         ? `<div class="dynamic-code-header">${escapeHtml(block.lang)}</div>`
         : ''
@@ -1399,6 +1432,7 @@ export function composeDynamicLayout(preparedDynamicDocument, metrics) {
       }
 
       cards.push({
+        key: `${block.cacheKey || cardClassName(block)}:${index}`,
         x,
         y,
         width,

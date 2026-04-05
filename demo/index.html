@@ -18,6 +18,21 @@
     <script type="module" src="./assets/demo.js"></script>
   </head>
   <body>
+    <div class="presentation-toolbar">
+      <div class="presentation-toolbar-copy">
+        <span class="presentation-toolbar-label">Presentation Mode</span>
+        <div class="presentation-toolbar-badges">
+          <span id="presentation-mode-badge" class="output-badge">classic</span>
+          <span id="presentation-template-badge" class="output-badge">demo</span>
+          <span id="presentation-view-badge" class="output-badge">preview</span>
+        </div>
+      </div>
+      <div class="presentation-toolbar-actions">
+        <button id="present-toolbar-exit" class="secondary-button" type="button">
+          Exit Preview
+        </button>
+      </div>
+    </div>
     <div class="page-shell">
       <header class="hero">
         <div class="hero-copy">
@@ -212,6 +227,7 @@
               <div class="output-badge-group">
                 <span id="mode-badge" class="output-badge">classic</span>
                 <span id="template-badge" class="output-badge">demo</span>
+                <span id="view-badge" class="output-badge">preview</span>
               </div>
               <p id="view-caption" class="view-caption">
                 Live rendered output with visual layout treatment.
@@ -220,7 +236,15 @@
                 Classic rendering shows the direct HTML flow for the selected template.
               </p>
             </div>
-            <span id="layout-status" class="layout-status" aria-live="polite"></span>
+            <div class="output-banner-actions">
+              <span id="layout-status" class="layout-status" aria-live="polite"></span>
+              <button id="copy-present-link" class="secondary-button present-button" type="button">
+                Copy Preview Link
+              </button>
+              <button id="present-toggle" class="secondary-button present-button" type="button">
+                Present Preview
+              </button>
+            </div>
           </div>
 
           <div class="stats-strip" id="stats-strip"></div>

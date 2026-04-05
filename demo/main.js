@@ -10,6 +10,7 @@ const STORAGE_KEY = 'premark-it-demo-locale'
 const LAYOUT_STORAGE_KEY = 'premark-it-demo-layout'
 const BALANCE_STORAGE_KEY = 'premark-it-demo-layout-balance'
 const metaDescription = document.querySelector('meta[name="description"]')
+const initialSearch = new URLSearchParams(window.location?.search || '')
 const dynamicPrepareCache = {
   textCache: new Map(),
   sourceBlockCache: new Map(),
@@ -112,6 +113,11 @@ const MESSAGES = {
       dynamicIdle: 'Dynamic mode is preparing a measured layout pass in the background.',
       dynamicReady: 'Dynamic layout is active and balancing content using cached prepare-time measurements.'
     },
+    presentationToolbarLabel: 'Presentation Mode',
+    copyPresentLink: 'Copy Preview Link',
+    copyPresentLinkSuccess: 'Presentation link copied.',
+    presentEnter: 'Present Preview',
+    presentExit: 'Exit Preview',
     copyHtml: 'Copy HTML',
     copySuccess: 'HTML copied.',
     copyFailure: 'Clipboard unavailable in this browser.',
@@ -306,6 +312,11 @@ console.log(md.render(prepared));
       dynamicIdle: '动态模式正在后台准备带度量信息的版式结果。',
       dynamicReady: '动态布局已启用，并会基于 prepare 阶段缓存的度量结果平衡内容。'
     },
+    presentationToolbarLabel: '展示模式',
+    copyPresentLink: '复制展示链接',
+    copyPresentLinkSuccess: '展示链接已复制。',
+    presentEnter: '全屏预览',
+    presentExit: '退出预览',
     copyHtml: '复制 HTML',
     copySuccess: 'HTML 已复制。',
     copyFailure: '当前浏览器无法访问剪贴板。',
@@ -422,13 +433,15 @@ const state = {
   layoutMode: detectLayoutMode(),
   templateKey: detectTemplateKey(),
   outputRatio: detectOutputRatio(),
+  presentationMode: detectPresentationMode(),
   dynamicPrepared: null,
   dynamicKey: '',
   renderToken: 0,
   dragPointerId: null,
   resizeFrame: 0,
   prepareHandle: 0,
-  pendingDynamicLayout: false
+  pendingDynamicLayout: false,
+  lastDynamicCardMap: new Map()
 }
 
 const elements = {
@@ -450,6 +463,7 @@ const elements = {
   editorModeChip: document.querySelector('#editor-mode-chip'),
   editorTemplateChip: document.querySelector('#editor-template-chip'),
   workspace: document.querySelector('.workspace'),
+  outputPanel: document.querySelector('.output-panel'),
   preview: document.querySelector('#preview-view'),
   htmlView: document.querySelector('#html-view'),
   tokensView: document.querySelector('#tokens-view'),
@@ -457,8 +471,16 @@ const elements = {
   copyHtml: document.querySelector('#copy-html'),
   modeBadge: document.querySelector('#mode-badge'),
   templateBadge: document.querySelector('#template-badge'),
+  viewBadge: document.querySelector('#view-badge'),
+  presentationModeBadge: document.querySelector('#presentation-mode-badge'),
+  presentationTemplateBadge: document.querySelector('#presentation-template-badge'),
+  presentationViewBadge: document.querySelector('#presentation-view-badge'),
+  presentationToolbarLabel: document.querySelector('.presentation-toolbar-label'),
+  presentationToolbarExit: document.querySelector('#present-toolbar-exit'),
+  copyPresentLink: document.querySelector('#copy-present-link'),
   outputSummary: document.querySelector('#output-summary'),
   layoutStatus: document.querySelector('#layout-status'),
+  presentToggle: document.querySelector('#present-toggle'),
   copyStatus: document.querySelector('#copy-status'),
   resetSample: document.querySelector('#reset-sample'),
   viewCaption: document.querySelector('#view-caption'),
@@ -534,6 +556,10 @@ function detectOutputRatio() {
   return 0.54
 }
 
+function detectPresentationMode() {
+  return initialSearch.get('present') === '1'
+}
+
 function readStoredLocale() {
   try {
     const value = localStorage.getItem(STORAGE_KEY)
@@ -595,6 +621,10 @@ function applyLocale() {
   elements.tablist.setAttribute('aria-label', messages.outputViewAriaLabel)
   elements.handle.setAttribute('aria-label', messages.layoutBalanceLabel)
   elements.editorHintKicker.textContent = messages.editorHint.kicker
+  elements.presentToggle.textContent = state.presentationMode ? messages.presentExit : messages.presentEnter
+  elements.presentationToolbarLabel.textContent = messages.presentationToolbarLabel
+  elements.presentationToolbarExit.textContent = messages.presentExit
+  elements.copyPresentLink.textContent = messages.copyPresentLink
   updateLayoutBalanceLabel()
   updateTemplateButtons()
   updateViewCaption()
@@ -615,12 +645,24 @@ function applyLayoutMode() {
   elements.workspace.style.setProperty('--output-fr', `${state.outputRatio.toFixed(3)}fr`)
   elements.modeBadge.textContent = state.layoutMode
   elements.templateBadge.textContent = state.templateKey
+  elements.viewBadge.textContent = state.view
+  elements.presentationModeBadge.textContent = state.layoutMode
+  elements.presentationTemplateBadge.textContent = state.templateKey
+  elements.presentationViewBadge.textContent = state.view
   elements.editorModeChip.textContent = state.layoutMode
   elements.editorTemplateChip.textContent = state.templateKey
   updateLayoutBalanceLabel()
   updateTemplateButtons()
   updateEditorHint()
   updateOutputSummary()
+}
+
+function applyPresentationMode() {
+  document.body.classList.toggle('presentation-mode', state.presentationMode)
+  if (state.presentationMode) {
+    state.view = 'preview'
+  }
+  updateViewSelection()
 }
 
 function updateLayoutBalanceLabel() {
@@ -636,6 +678,8 @@ function updateTemplateButtons() {
 
 function updateViewCaption() {
   elements.viewCaption.textContent = currentMessages().viewCaptions[state.view]
+  elements.viewBadge.textContent = state.view
+  elements.presentationViewBadge.textContent = state.view
 }
 
 function updateEditorHint() {
@@ -740,6 +784,8 @@ function renderStats(prepared, prepareDuration, renderDuration) {
 }
 
 function updateViewSelection() {
+  elements.outputPanel.dataset.activeView = state.view
+
   elements.tabs.forEach((button) => {
     const active = button.dataset.view === state.view
     button.classList.toggle('is-active', active)
@@ -762,6 +808,59 @@ function renderEmptyPreview() {
   elements.stats.innerHTML = ''
   elements.layoutStatus.textContent = ''
   updateOutputSummary()
+}
+
+async function requestFullscreenIfAvailable() {
+  const target = document.documentElement
+  if (typeof target.requestFullscreen === 'function') {
+    try {
+      await target.requestFullscreen()
+    } catch {}
+  }
+}
+
+async function exitFullscreenIfNeeded() {
+  if (document.fullscreenElement && typeof document.exitFullscreen === 'function') {
+    try {
+      await document.exitFullscreen()
+    } catch {}
+  }
+}
+
+function updatePresentationUrl() {
+  if (!window.history?.replaceState || !window.location) {
+    return
+  }
+
+  const url = new URL(window.location.href)
+  if (state.presentationMode) {
+    url.searchParams.set('present', '1')
+  } else {
+    url.searchParams.delete('present')
+  }
+
+  window.history.replaceState({}, '', url)
+}
+
+function presentationHref() {
+  const url = new URL(window.location.href)
+  url.searchParams.set('present', '1')
+  return url.toString()
+}
+
+async function setPresentationMode(enabled, options = {}) {
+  state.presentationMode = enabled
+  applyPresentationMode()
+  updatePresentationUrl()
+  applyLocale()
+
+  if (enabled && options.requestFullscreen !== false) {
+    await requestFullscreenIfAvailable()
+  }
+
+  if (!enabled && options.exitFullscreen !== false) {
+    await exitFullscreenIfNeeded()
+  }
 }
 
 function scheduleIdleTask(callback) {
@@ -848,6 +947,7 @@ function renderDynamicPreview(layout) {
       ${layout.cards.map((card) => `
         <section
           class="${card.className}"
+          data-card-key="${card.key}"
           style="left:${Math.round(card.x)}px;top:${Math.round(card.y)}px;width:${Math.round(card.width)}px;height:${Math.round(card.height)}px"
         >
           ${card.html}
@@ -855,6 +955,48 @@ function renderDynamicPreview(layout) {
       `).join('')}
     </div>
   `
+
+  const nextMap = new Map(layout.cards.map((card) => [card.key, card]))
+  const stage = elements.preview.querySelector?.('.dynamic-stage')
+  if (stage) {
+    const cardNodes = stage.querySelectorAll?.('[data-card-key]') || []
+    cardNodes.forEach((node) => {
+      const key = node.dataset.cardKey
+      const previous = state.lastDynamicCardMap.get(key)
+      const next = nextMap.get(key)
+
+      if (!previous || !next) {
+        node.classList.add('dynamic-card-entering')
+        requestAnimationFrame(() => {
+          node.classList.remove('dynamic-card-entering')
+        })
+        return
+      }
+
+      const deltaX = previous.x - next.x
+      const deltaY = previous.y - next.y
+
+      if (deltaX === 0 && deltaY === 0) {
+        return
+      }
+
+      node.style.transform = `translate(${deltaX}px, ${deltaY}px)`
+      node.classList.add('dynamic-card-animating')
+
+      requestAnimationFrame(() => {
+        node.style.transform = ''
+      })
+
+      const cleanup = () => {
+        node.classList.remove('dynamic-card-animating')
+        node.removeEventListener('transitionend', cleanup)
+      }
+
+      node.addEventListener('transitionend', cleanup)
+    })
+  }
+
+  state.lastDynamicCardMap = nextMap
 }
 
 function scheduleDynamicRecompose() {
@@ -1084,6 +1226,29 @@ elements.copyHtml.addEventListener('click', async () => {
   }
 })
 
+elements.presentToggle.addEventListener('click', async () => {
+  await setPresentationMode(!state.presentationMode)
+})
+
+elements.presentationToolbarExit.addEventListener('click', async () => {
+  await setPresentationMode(false)
+})
+
+elements.copyPresentLink.addEventListener('click', async () => {
+  try {
+    await navigator.clipboard.writeText(presentationHref())
+    elements.copyStatus.textContent = currentMessages().copyPresentLinkSuccess
+  } catch {
+    elements.copyStatus.textContent = currentMessages().copyFailure
+  }
+})
+
+window.addEventListener('keydown', async (event) => {
+  if (event.key === 'Escape' && state.presentationMode) {
+    await setPresentationMode(false, { exitFullscreen: true })
+  }
+})
+
 elements.handle.addEventListener('pointerdown', (event) => {
   if (state.layoutMode !== 'dynamic' || window.innerWidth <= WORKSPACE_BREAKPOINT) {
     return
@@ -1134,4 +1299,5 @@ window.addEventListener('resize', () => {
   scheduleDynamicRecompose()
 })
 
+applyPresentationMode()
 refresh()
