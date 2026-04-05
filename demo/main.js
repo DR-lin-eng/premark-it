@@ -63,6 +63,23 @@ const MESSAGES = {
       article: 'Editorial',
       docs: 'Docs'
     },
+    templateCards: {
+      demo: {
+        kicker: 'Showcase',
+        title: 'Parser Tour',
+        body: 'A balanced sample with image, table, and code.'
+      },
+      article: {
+        kicker: 'Editorial',
+        title: 'Reading Flow',
+        body: 'A narrative sample for lede, quote, and figure behavior.'
+      },
+      docs: {
+        kicker: 'Docs',
+        title: 'API Guide',
+        body: 'A more structured sample for documentation-style output.'
+      }
+    },
     options: {
       html: 'Allow HTML',
       linkify: 'Linkify',
@@ -70,7 +87,13 @@ const MESSAGES = {
       breaks: 'Hard breaks',
       xhtmlOut: 'XHTML output'
     },
+    editorHint: {
+      kicker: 'Editing Notes',
+      classic: 'Classic mode shows the direct rendered HTML flow. Use it to inspect baseline parser output.',
+      dynamic: 'Dynamic mode prepares layout in the background, then upgrades the preview when ready.'
+    },
     textareaAriaLabel: 'Markdown input',
+    textareaPlaceholder: 'Write Markdown here',
     outputKicker: 'Output',
     outputTitle: 'Live Result',
     outputViewAriaLabel: 'Output views',
@@ -78,6 +101,16 @@ const MESSAGES = {
       preview: 'Preview',
       html: 'HTML',
       tokens: 'Tokens'
+    },
+    viewCaptions: {
+      preview: 'Live rendered output with visual layout treatment.',
+      html: 'The exact HTML string produced by the current parser configuration.',
+      tokens: 'A readable token tree for debugging the parser pipeline.'
+    },
+    outputSummaries: {
+      classic: 'Classic rendering shows the direct HTML flow for the selected template.',
+      dynamicIdle: 'Dynamic mode is preparing a measured layout pass in the background.',
+      dynamicReady: 'Dynamic layout is active and balancing content using cached prepare-time measurements.'
     },
     copyHtml: 'Copy HTML',
     copySuccess: 'HTML copied.',
@@ -224,6 +257,23 @@ console.log(md.render(prepared));
       article: '文章',
       docs: '文档'
     },
+    templateCards: {
+      demo: {
+        kicker: '展示',
+        title: '解析器总览',
+        body: '包含图片、表格和代码的平衡示例。'
+      },
+      article: {
+        kicker: '文章',
+        title: '阅读流动感',
+        body: '更适合观察导言、引用和图片编排效果。'
+      },
+      docs: {
+        kicker: '文档',
+        title: 'API 指南',
+        body: '更适合展示文档风格的结构化输出。'
+      }
+    },
     options: {
       html: '允许 HTML',
       linkify: '自动链接',
@@ -231,7 +281,13 @@ console.log(md.render(prepared));
       breaks: '强制换行',
       xhtmlOut: 'XHTML 输出'
     },
+    editorHint: {
+      kicker: '编辑提示',
+      classic: '经典模式会直接显示渲染后的 HTML 流，用来观察解析器的基础输出。',
+      dynamic: '动态模式会先在后台准备版式，然后在准备完成后升级预览。'
+    },
     textareaAriaLabel: 'Markdown 输入',
+    textareaPlaceholder: '在这里输入 Markdown',
     outputKicker: '输出',
     outputTitle: '实时结果',
     outputViewAriaLabel: '输出视图',
@@ -239,6 +295,16 @@ console.log(md.render(prepared));
       preview: '预览',
       html: 'HTML',
       tokens: '令牌'
+    },
+    viewCaptions: {
+      preview: '展示当前内容的渲染结果和版式表现。',
+      html: '展示当前解析配置实际生成的 HTML 字符串。',
+      tokens: '展示更适合调试的 token 结构树。'
+    },
+    outputSummaries: {
+      classic: '经典模式会直接展示当前模板对应的 HTML 流式渲染结果。',
+      dynamicIdle: '动态模式正在后台准备带度量信息的版式结果。',
+      dynamicReady: '动态布局已启用，并会基于 prepare 阶段缓存的度量结果平衡内容。'
     },
     copyHtml: '复制 HTML',
     copySuccess: 'HTML 已复制。',
@@ -379,6 +445,10 @@ const elements = {
   breaks: document.querySelector('#breaks'),
   xhtmlOut: document.querySelector('#xhtmlOut'),
   input: document.querySelector('#markdown-input'),
+  editorHintBody: document.querySelector('#editor-hint-body'),
+  editorHintKicker: document.querySelector('.editor-hint-kicker'),
+  editorModeChip: document.querySelector('#editor-mode-chip'),
+  editorTemplateChip: document.querySelector('#editor-template-chip'),
   workspace: document.querySelector('.workspace'),
   preview: document.querySelector('#preview-view'),
   htmlView: document.querySelector('#html-view'),
@@ -387,10 +457,13 @@ const elements = {
   copyHtml: document.querySelector('#copy-html'),
   modeBadge: document.querySelector('#mode-badge'),
   templateBadge: document.querySelector('#template-badge'),
+  outputSummary: document.querySelector('#output-summary'),
   layoutStatus: document.querySelector('#layout-status'),
   copyStatus: document.querySelector('#copy-status'),
   resetSample: document.querySelector('#reset-sample'),
+  viewCaption: document.querySelector('#view-caption'),
   tabs: Array.from(document.querySelectorAll('.tab-button')),
+  templateButtons: Array.from(document.querySelectorAll('[data-template-button]')),
   panels: Array.from(document.querySelectorAll('[data-view-panel]')),
   tablist: document.querySelector('.tablist')
 }
@@ -518,9 +591,15 @@ function applyLocale() {
   elements.templateSelect.options[2].textContent = messages.templateOptions.docs
   elements.locale.setAttribute('aria-label', messages.localeAriaLabel)
   elements.input.setAttribute('aria-label', messages.textareaAriaLabel)
+  elements.input.setAttribute('placeholder', messages.textareaPlaceholder)
   elements.tablist.setAttribute('aria-label', messages.outputViewAriaLabel)
   elements.handle.setAttribute('aria-label', messages.layoutBalanceLabel)
+  elements.editorHintKicker.textContent = messages.editorHint.kicker
   updateLayoutBalanceLabel()
+  updateTemplateButtons()
+  updateViewCaption()
+  updateEditorHint()
+  updateOutputSummary()
   updateLayoutStatus()
 }
 
@@ -536,11 +615,43 @@ function applyLayoutMode() {
   elements.workspace.style.setProperty('--output-fr', `${state.outputRatio.toFixed(3)}fr`)
   elements.modeBadge.textContent = state.layoutMode
   elements.templateBadge.textContent = state.templateKey
+  elements.editorModeChip.textContent = state.layoutMode
+  elements.editorTemplateChip.textContent = state.templateKey
   updateLayoutBalanceLabel()
+  updateTemplateButtons()
+  updateEditorHint()
+  updateOutputSummary()
 }
 
 function updateLayoutBalanceLabel() {
   elements.layoutBalanceValue.textContent = `${Math.round(state.outputRatio * 100)}%`
+}
+
+function updateTemplateButtons() {
+  elements.templateButtons.forEach((button) => {
+    const active = button.dataset.templateButton === state.templateKey
+    button.classList.toggle('is-active', active)
+  })
+}
+
+function updateViewCaption() {
+  elements.viewCaption.textContent = currentMessages().viewCaptions[state.view]
+}
+
+function updateEditorHint() {
+  const messages = currentMessages()
+  elements.editorHintBody.textContent =
+    state.layoutMode === 'dynamic'
+      ? messages.editorHint.dynamic
+      : messages.editorHint.classic
+}
+
+function updateOutputSummary() {
+  const summaries = currentMessages().outputSummaries
+  elements.outputSummary.textContent =
+    state.layoutMode === 'dynamic'
+      ? (state.pendingDynamicLayout ? summaries.dynamicIdle : summaries.dynamicReady)
+      : summaries.classic
 }
 
 function createParser() {
@@ -639,6 +750,8 @@ function updateViewSelection() {
     const active = panel.dataset.viewPanel === state.view
     panel.classList.toggle('is-hidden', !active)
   })
+
+  updateViewCaption()
 }
 
 function renderEmptyPreview() {
@@ -648,6 +761,7 @@ function renderEmptyPreview() {
   elements.tokensView.textContent = ''
   elements.stats.innerHTML = ''
   elements.layoutStatus.textContent = ''
+  updateOutputSummary()
 }
 
 function scheduleIdleTask(callback) {
@@ -675,6 +789,7 @@ function updateLayoutStatus() {
   elements.layoutStatus.textContent = state.pendingDynamicLayout
     ? currentMessages().layoutPreparing
     : (state.layoutMode === 'dynamic' && state.dynamicPrepared ? currentMessages().layoutReady : '')
+  updateOutputSummary()
 }
 
 function dynamicCacheKey(source) {
@@ -945,6 +1060,18 @@ elements.tabs.forEach((button) => {
   button.addEventListener('click', () => {
     state.view = button.dataset.view
     updateViewSelection()
+  })
+})
+
+elements.templateButtons.forEach((button) => {
+  button.addEventListener('click', () => {
+    state.templateKey = button.dataset.templateButton
+    elements.templateSelect.value = state.templateKey
+    persistTemplateKey(state.templateKey)
+    elements.input.value = currentTemplateSource()
+    state.dynamicPrepared = null
+    applyLayoutMode()
+    refresh()
   })
 })
 

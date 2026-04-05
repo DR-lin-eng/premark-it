@@ -109,10 +109,21 @@ function createEnvironment () {
   register('#copy-html', new StubNode({ id: 'copy-html', tag: 'button' }))
   register('#mode-badge', new StubNode({ id: 'mode-badge', tag: 'span' }))
   register('#template-badge', new StubNode({ id: 'template-badge', tag: 'span' }))
+  register('#output-summary', new StubNode({ id: 'output-summary', tag: 'p' }))
   register('#layout-status', new StubNode({ id: 'layout-status' }))
   register('#copy-status', new StubNode({ id: 'copy-status' }))
   register('#reset-sample', new StubNode({ id: 'reset-sample', tag: 'button' }))
+  register('#view-caption', new StubNode({ id: 'view-caption', tag: 'p' }))
+  register('#editor-hint-body', new StubNode({ id: 'editor-hint-body', tag: 'p' }))
+  register('.editor-hint-kicker', new StubNode({ className: 'editor-hint-kicker', tag: 'p' }))
+  register('#editor-mode-chip', new StubNode({ id: 'editor-mode-chip', tag: 'span' }))
+  register('#editor-template-chip', new StubNode({ id: 'editor-template-chip', tag: 'span' }))
   const tablist = register('.tablist', new StubNode({ className: 'tablist' }))
+  const templateButtons = [
+    new StubNode({ dataset: { templateButton: 'demo' }, className: 'template-card is-active', tag: 'button' }),
+    new StubNode({ dataset: { templateButton: 'article' }, className: 'template-card', tag: 'button' }),
+    new StubNode({ dataset: { templateButton: 'docs' }, className: 'template-card', tag: 'button' })
+  ]
 
   for (const key of [
     'eyebrow',
@@ -131,6 +142,15 @@ function createEnvironment () {
     'heroPills.prepare',
     'heroPills.dynamic',
     'heroPills.i18n',
+    'templateCards.demo.kicker',
+    'templateCards.demo.title',
+    'templateCards.demo.body',
+    'templateCards.article.kicker',
+    'templateCards.article.title',
+    'templateCards.article.body',
+    'templateCards.docs.kicker',
+    'templateCards.docs.title',
+    'templateCards.docs.body',
     'options.html',
     'options.linkify',
     'options.typographer',
@@ -167,6 +187,7 @@ function createEnvironment () {
       if (selector === '[data-i18n]') return dataI18nNodes
       if (selector === '[data-i18n-html]') return dataI18nHtmlNodes
       if (selector === '.tab-button') return tabButtons
+      if (selector === '[data-template-button]') return templateButtons
       if (selector === '[data-view-panel]') return panels
       return []
     },
@@ -265,6 +286,7 @@ function createEnvironment () {
     handle,
     workspace,
     tablist,
+    templateButtons,
     dataI18nNodes
   }
 }
@@ -320,6 +342,7 @@ describe('Demo i18n and layout', function () {
     env.templateSelect.dispatch('change')
     await new Promise((resolve) => setTimeout(resolve, 0))
     assert.include(env.input.value, 'Premark-It Quickstart')
+    assert.include(env.templateButtons[2].className, 'is-active')
     env.handle.dispatch('keydown', { key: 'ArrowRight' })
     await new Promise((resolve) => setTimeout(resolve, 0))
     assert.include(env.workspace.attributes.style, '--output-fr: 0.650fr')

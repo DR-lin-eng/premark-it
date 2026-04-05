@@ -84,7 +84,7 @@
               </select>
             </label>
 
-            <label class="control">
+            <label class="control template-select-control">
               <span data-i18n="templateLabel">Template</span>
               <select id="template-select">
                 <option value="demo">demo</option>
@@ -125,10 +125,60 @@
             </label>
           </div>
 
+          <div class="template-gallery">
+            <button class="template-card is-active" type="button" data-template-button="demo">
+              <div class="template-card-visual template-card-visual-demo" aria-hidden="true">
+                <span class="visual-block visual-block-title"></span>
+                <span class="visual-block visual-block-text"></span>
+                <span class="visual-block visual-block-side"></span>
+                <span class="visual-block visual-block-wide"></span>
+              </div>
+              <span class="template-card-kicker" data-i18n="templateCards.demo.kicker">Showcase</span>
+              <strong class="template-card-title" data-i18n="templateCards.demo.title">Parser Tour</strong>
+              <span class="template-card-body" data-i18n="templateCards.demo.body">A balanced sample with image, table, and code.</span>
+            </button>
+            <button class="template-card" type="button" data-template-button="article">
+              <div class="template-card-visual template-card-visual-article" aria-hidden="true">
+                <span class="visual-block visual-block-title"></span>
+                <span class="visual-block visual-block-quote"></span>
+                <span class="visual-block visual-block-image"></span>
+                <span class="visual-block visual-block-text"></span>
+              </div>
+              <span class="template-card-kicker" data-i18n="templateCards.article.kicker">Editorial</span>
+              <strong class="template-card-title" data-i18n="templateCards.article.title">Reading Flow</strong>
+              <span class="template-card-body" data-i18n="templateCards.article.body">A narrative sample for lede, quote, and figure behavior.</span>
+            </button>
+            <button class="template-card" type="button" data-template-button="docs">
+              <div class="template-card-visual template-card-visual-docs" aria-hidden="true">
+                <span class="visual-block visual-block-title"></span>
+                <span class="visual-block visual-block-code"></span>
+                <span class="visual-block visual-block-wide"></span>
+                <span class="visual-block visual-block-text"></span>
+              </div>
+              <span class="template-card-kicker" data-i18n="templateCards.docs.kicker">Docs</span>
+              <strong class="template-card-title" data-i18n="templateCards.docs.title">API Guide</strong>
+              <span class="template-card-body" data-i18n="templateCards.docs.body">A more structured sample for documentation-style output.</span>
+            </button>
+          </div>
+
+          <div class="editor-hint-card">
+            <div class="editor-hint-copy">
+              <p class="editor-hint-kicker" data-i18n="editorHint.kicker">Editing Notes</p>
+              <p id="editor-hint-body" class="editor-hint-body">
+                Dynamic mode prepares layout in the background, then upgrades the preview when ready.
+              </p>
+            </div>
+            <div class="editor-hint-metrics">
+              <span id="editor-mode-chip" class="editor-chip">classic</span>
+              <span id="editor-template-chip" class="editor-chip">demo</span>
+            </div>
+          </div>
+
           <textarea
             id="markdown-input"
             spellcheck="false"
             aria-label="Markdown input"
+            placeholder="Write Markdown here"
           ></textarea>
         </section>
 
@@ -158,9 +208,17 @@
           </div>
 
           <div class="output-banner">
-            <div class="output-badge-group">
-              <span id="mode-badge" class="output-badge">classic</span>
-              <span id="template-badge" class="output-badge">demo</span>
+            <div class="output-banner-copy">
+              <div class="output-badge-group">
+                <span id="mode-badge" class="output-badge">classic</span>
+                <span id="template-badge" class="output-badge">demo</span>
+              </div>
+              <p id="view-caption" class="view-caption">
+                Live rendered output with visual layout treatment.
+              </p>
+              <p id="output-summary" class="output-summary">
+                Classic rendering shows the direct HTML flow for the selected template.
+              </p>
             </div>
             <span id="layout-status" class="layout-status" aria-live="polite"></span>
           </div>
