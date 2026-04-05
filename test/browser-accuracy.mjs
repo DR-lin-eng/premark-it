@@ -133,14 +133,15 @@ async function run() {
         await page.selectOption('#usage-mode', 'function-api')
 
         const editorialEngine = await page.evaluate(() => {
+          const usage = document.querySelector('#usage-code')?.textContent || ''
           return {
-            hasUsage: Boolean(document.querySelector('#usage-code')?.textContent?.includes('PremarkItEditorial.render')),
-            hasCustomElementUsage: Boolean(document.querySelector('#usage-code')?.textContent?.includes('capability:')),
+            hasUsage: usage.includes('PremarkItEditorial.'),
+            hasConvenienceUsage: /PremarkItEditorial\.[a-zA-Z]+\(/.test(usage),
             previewTitle: document.querySelector('#capability-title')?.textContent || ''
           }
         })
 
-        if (!editorialEngine.hasUsage) {
+        if (!editorialEngine.hasUsage || !editorialEngine.hasConvenienceUsage) {
           throw new Error('editorial engine usage snippet did not render')
         }
 

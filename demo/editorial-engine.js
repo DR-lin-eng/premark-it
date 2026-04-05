@@ -70,6 +70,12 @@ User: Great, now make it feel like a native app bubble layout.`
     libraryCapability: 'rich-text',
     markdown: `Rich inline content can mix **bold guidance**, [documentation](https://github.com/chenglou/pretext), [[prepare()]], [[layoutNextLine()]], and [[DOM correction]] into one composable surface.`
   },
+  'inline-flow': {
+    title: 'Inline Flow',
+    description: 'Inline prose and chip-like annotations flowing together as one measured line-wrapped surface.',
+    libraryCapability: 'inline-flow',
+    markdown: `Inline prose can wrap beside [[prepare()]], [[layoutNextLine()]], [[materializeLineRange()]], and [[DOM correction]] without falling back to hard-coded widths.`
+  },
   bubbles: {
     title: 'Bubbles',
     description: 'Shrink-wrapped message bubbles measured from content, useful for quotes, comments, and compact reactions.',
@@ -133,6 +139,18 @@ This is a good fit for docs, FAQs, and inline product explainers.`
     description: 'A small typographic comparison between proportional and monospaced placement for the same input string.',
     libraryCapability: 'ascii',
     markdown: 'PREMARK 2026'
+  },
+  'line-break': {
+    title: 'Line Break',
+    description: 'Shows the same prepared text laid out at multiple widths so break decisions become visible.',
+    libraryCapability: 'line-break',
+    markdown: `Line breaking is where run analysis, width-independent prepared data, and browser profile preferences all become visible. URLs like https://github.com/chenglou/pretext should remain stable while smaller widths force earlier choices.`
+  },
+  'prepare-profile': {
+    title: 'Prepare Profile',
+    description: 'A lightweight inspector for the prepared text handle: engine profile, chunk count, unit count, and run kinds.',
+    libraryCapability: 'prepare-profile',
+    markdown: `Profile this markdown source for emoji 😀🙂🚀, mixed text 你好 world, and numbers like 2026/04/05 so the prepared handle exposes what was measured.`
   }
 }
 
@@ -179,19 +197,31 @@ ${markdownSource}
     return
   }
 
+  const methodMap = {
+    'editorial-engine': 'editorial',
+    'dynamic-layout': 'dynamicLayout',
+    'markdown-chat': 'chat',
+    'rich-text': 'richText',
+    'inline-flow': 'inlineFlow',
+    bubbles: 'bubbles',
+    masonry: 'masonry',
+    accordion: 'accordion',
+    justification: 'justification',
+    ascii: 'ascii',
+    'line-break': 'lineBreak',
+    'prepare-profile': 'prepareProfile'
+  }
+  const convenienceMethod = methodMap[capability.libraryCapability] || 'render'
   elements.usageSummary.textContent = 'Use the global helper and the template-string wrapper for the lowest-code function-based integration.'
   elements.usageCode.textContent = `<div id="hero"></div>
 <script src="./assets/premark-it-editorial.js"></script>
 <script>
-  PremarkItEditorial.render(
+  PremarkItEditorial.${convenienceMethod}(
     '#hero',
     PremarkItEditorial.md\`
 ${markdownSource}
 \`,
-    {
-      capability: '${capability.libraryCapability}',
-      locale: '${elements.locale.value}'
-    }
+    { locale: '${elements.locale.value}' }
   )
 </script>`
 }

@@ -8,6 +8,7 @@ import { BROWSER_STYLES } from './browser-styles.js'
 import {
   layout,
   layoutWithLines,
+  profilePrepare,
   prepareRichText,
   prepareText
 } from '../prelayout/index.mjs'
@@ -166,6 +167,17 @@ function plainTextFromMarkdown(parser, markdownSource) {
   const wrapper = document.createElement('div')
   wrapper.innerHTML = parser.render(markdownSource)
   return wrapper.textContent || ''
+}
+
+function readMarkdownSource(source) {
+  if (!source) return ''
+
+  const scriptLike = source.querySelector?.('script[type="text/markdown"], template[data-markdown]')
+  if (scriptLike) {
+    return scriptLike.textContent || ''
+  }
+
+  return source.getAttribute?.('markdown') || source.textContent || ''
 }
 
 function paragraphBlocks(markdownSource) {
@@ -420,6 +432,118 @@ function parseRichSegments(markdownSource) {
   return segments
 }
 
+function parseInlineFlow(markdownSource) {
+  const segments = []
+  const chipRegex = /\[\[([^\]]+)\]\]/g
+  let lastIndex = 0
+  let match
+
+  while ((match = chipRegex.exec(markdownSource))) {
+    if (match.index > lastIndex) {
+      segments.push({ kind: 'text', text: markdownSource.slice(lastIndex, match.index) })
+    }
+    segments.push({ kind: 'chip', text: match[1] })
+    lastIndex = chipRegex.lastIndex
+  }
+
+  if (lastIndex < markdownSource.length) {
+    segments.push({ kind: 'text', text: markdownSource.slice(lastIndex) })
+  }
+
+  return segments
+}
+
+function renderInlineFlowCapability(stage, _parser, markdownSource, options) {
+  const pieces = parseInlineFlow(markdownSource)
+  const segments = []
+  pieces.forEach((piece) => {
+    if (piece.kind === 'chip') {
+      segments.push({
+        text: ` ${piece.text} `,
+        strong: true
+      })
+      return
+    }
+    segments.push({ text: piece.text })
+  })
+
+  const prepared = prepareRichText(segments, TEXT_STYLE_BODY, { locale: options.locale })
+  const rendered = renderPlainPrepared(prepared, Math.min(820, stage.clientWidth || 820), 'premark-line premark-inline-flow-line')
+
+  stage.innerHTML = `
+    <div class="premark-demo-label">Inline Flow</div>
+    <div class="premark-inline-flow-shell">
+      ${pieces.map((piece) => {
+        if (piece.kind === 'chip') {
+          return `<span class="premark-chip">${piece.text}</span>`
+        }
+        return `<span class="premark-inline-fragment">${piece.text}</span>`
+      }).join('')}
+    </div>
+    <div class="premark-inline-flow-measured">
+      ${rendered.html}
+    </div>
+  `
+}
+
+function renderLineBreakCapability(stage, parser, markdownSource, options) {
+  const text = plainTextFromMarkdown(parser, markdownSource)
+  const prepared = prepareText(text, TEXT_STYLE_BODY, { locale: options.locale })
+  const widths = [240, 320, 420]
+  const rows = widths.map((width) => {
+    const measured = layoutWithLines(prepared, width)
+    return `
+      <section class="premark-line-break-card">
+        <h3>${width}px</h3>
+        <div class="premark-line-break-preview">
+          ${renderPlainPrepared(prepared, width, 'premark-line premark-line-break-line').html}
+        </div>
+        <p class="premark-line-break-meta">${measured.lineCount} lines</p>
+      </section>
+    `
+  }).join('')
+
+  stage.innerHTML = `
+    <div class="premark-demo-label">Line Break</div>
+    <div class="premark-line-break-grid">${rows}</div>
+  `
+}
+
+function renderPrepareProfileCapability(stage, parser, markdownSource, options) {
+  const text = plainTextFromMarkdown(parser, markdownSource)
+  const prepared = prepareText(text, TEXT_STYLE_BODY, { locale: options.locale })
+  const profile = profilePrepare(prepared)
+  const runKinds = prepared.units.reduce((acc, unit) => {
+    acc[unit.analysisKind || unit.kind] = (acc[unit.analysisKind || unit.kind] || 0) + 1
+    return acc
+  }, {})
+
+  stage.innerHTML = `
+    <div class="premark-demo-label">Prepare Profile</div>
+    <div class="premark-profile-grid">
+      <div class="premark-profile-card">
+        <h3>Engine</h3>
+        <p>${profile.engineProfile}</p>
+      </div>
+      <div class="premark-profile-card">
+        <h3>Units</h3>
+        <p>${profile.unitCount}</p>
+      </div>
+      <div class="premark-profile-card">
+        <h3>Chunks</h3>
+        <p>${profile.chunkCount}</p>
+      </div>
+      <div class="premark-profile-card">
+        <h3>Correction</h3>
+        <p>${profile.correctionApplied ? 'Applied' : 'None'}</p>
+      </div>
+    </div>
+    <div class="premark-profile-detail">
+      ${Object.entries(runKinds).map(([kind, count]) => `<span class="premark-chip">${kind}: ${count}</span>`).join('')}
+    </div>
+  `
+}
+
 function renderRichTextCapability(stage, parser, markdownSource, options) {
   const parts = parseRichSegments(markdownSource)
   const html = parts.map((part) => {
@@ -495,6 +619,9 @@ function renderCapabilityPreview(stage, parser, markdownSource, options) {
     case 'rich-text':
       renderRichTextCapability(stage, parser, markdownSource, options)
       return false
+    case 'inline-flow':
+      renderInlineFlowCapability(stage, parser, markdownSource, options)
+      return false
     case 'masonry':
       renderMasonryCapability(stage, parser, markdownSource, options)
       return false
@@ -503,6 +630,12 @@ function renderCapabilityPreview(stage, parser, markdownSource, options) {
       return false
     case 'ascii':
       renderAsciiCapability(stage, parser, markdownSource, options)
+      return false
+    case 'line-break':
+      renderLineBreakCapability(stage, parser, markdownSource, options)
+      return false
+    case 'prepare-profile':
+      renderPrepareProfileCapability(stage, parser, markdownSource, options)
       return false
     case 'dynamic-layout':
       return true
@@ -606,7 +739,7 @@ function createRenderRoot(target, options) {
 }
 
 function readElementMarkdown(element) {
-  return element.getAttribute('markdown') || element.textContent || ''
+  return readMarkdownSource(element)
 }
 
 function createController(target, initialMarkdown, initialOptions = {}) {
@@ -833,7 +966,43 @@ const api = {
   md,
   render,
   create: createController,
-  upgradeAll
+  upgradeAll,
+  editorial(target, markdownSource, options = {}) {
+    return render(target, markdownSource, { ...options, capability: 'editorial-engine' })
+  },
+  dynamicLayout(target, markdownSource, options = {}) {
+    return render(target, markdownSource, { ...options, capability: 'dynamic-layout' })
+  },
+  chat(target, markdownSource, options = {}) {
+    return render(target, markdownSource, { ...options, capability: 'markdown-chat', useDynamic: false })
+  },
+  richText(target, markdownSource, options = {}) {
+    return render(target, markdownSource, { ...options, capability: 'rich-text', useDynamic: false })
+  },
+  inlineFlow(target, markdownSource, options = {}) {
+    return render(target, markdownSource, { ...options, capability: 'inline-flow', useDynamic: false })
+  },
+  bubbles(target, markdownSource, options = {}) {
+    return render(target, markdownSource, { ...options, capability: 'bubbles', useDynamic: false })
+  },
+  masonry(target, markdownSource, options = {}) {
+    return render(target, markdownSource, { ...options, capability: 'masonry', useDynamic: false })
+  },
+  accordion(target, markdownSource, options = {}) {
+    return render(target, markdownSource, { ...options, capability: 'accordion', useDynamic: false })
+  },
+  justification(target, markdownSource, options = {}) {
+    return render(target, markdownSource, { ...options, capability: 'justification', useDynamic: false })
+  },
+  ascii(target, markdownSource, options = {}) {
+    return render(target, markdownSource, { ...options, capability: 'ascii', useDynamic: false })
+  },
+  lineBreak(target, markdownSource, options = {}) {
+    return render(target, markdownSource, { ...options, capability: 'line-break', useDynamic: false })
+  },
+  prepareProfile(target, markdownSource, options = {}) {
+    return render(target, markdownSource, { ...options, capability: 'prepare-profile', useDynamic: false })
+  }
 }
 
 if (typeof window !== 'undefined') {
