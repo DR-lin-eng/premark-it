@@ -838,11 +838,75 @@ function updateViewSelection() {
 function renderEmptyPreview() {
   const empty = `<div class="empty-state"><p>${currentMessages().emptyState}</p></div>`
   elements.preview.innerHTML = empty
+  elements.preview.classList.toggle('rendered-view-pending', false)
   elements.htmlView.textContent = ''
   elements.tokensView.textContent = ''
   elements.stats.innerHTML = ''
   elements.layoutStatus.textContent = ''
   updateOutputSummary()
+}
+
+function wrapPreviewNode(node, className) {
+  if (!node?.parentNode || typeof document.createElement !== 'function') {
+    return null
+  }
+
+  const wrapper = document.createElement('div')
+  wrapper.className = className
+  node.parentNode.insertBefore(wrapper, node)
+  wrapper.appendChild(node)
+  return wrapper
+}
+
+function enhanceClassicPreview() {
+  const article = elements.preview.querySelector?.('.rendered-article')
+  if (!article || !article.children) {
+    return
+  }
+
+  const children = Array.from(article.children)
+  children.forEach((node, index) => {
+    const tag = node.tagName?.toLowerCase?.()
+    const previous = children[index - 1] || null
+
+    if (tag === 'h1' && index > 0) {
+      node.classList.add('rendered-section-title')
+    }
+
+    if (tag === 'p' && previous?.tagName === 'H1') {
+      node.classList.add('rendered-lede')
+    }
+
+    if (tag === 'blockquote') {
+      node.classList.add('rendered-note')
+    }
+
+    if (tag === 'ul' || tag === 'ol') {
+      node.classList.add('rendered-list')
+    }
+
+    if (tag === 'pre') {
+      wrapPreviewNode(node, 'rendered-code-shell')
+    }
+
+    if (tag === 'table') {
+      wrapPreviewNode(node, 'rendered-table-shell')
+    }
+
+    if (
+      tag === 'p' &&
+      node.childElementCount === 1 &&
+      node.firstElementChild?.tagName === 'IMG'
+    ) {
+      node.classList.add('rendered-figure-block')
+    }
+  })
+}
+
+function renderClassicPreview(html, { pending = false } = {}) {
+  elements.preview.classList.toggle('rendered-view-pending', pending)
+  elements.preview.innerHTML = `<div class="rendered-article">${html}</div>`
+  enhanceClassicPreview()
 }
 
 async function requestFullscreenIfAvailable() {
@@ -977,6 +1041,7 @@ function stopWorkspaceDrag() {
 }
 
 function renderDynamicPreview(layout) {
+  elements.preview.classList.toggle('rendered-view-pending', false)
   elements.preview.innerHTML = `
     <div class="dynamic-stage" style="height:${Math.ceil(layout.height)}px">
       ${layout.items.map((item) => `
@@ -1124,7 +1189,7 @@ async function refresh() {
     } else {
       state.pendingDynamicLayout = true
       updateLayoutStatus()
-      elements.preview.innerHTML = html
+      renderClassicPreview(html, { pending: true })
 
       state.prepareHandle = scheduleIdleTask(async () => {
         const preparedDynamic = await ensureDynamicPrepared(source, md, renderToken)
@@ -1143,7 +1208,7 @@ async function refresh() {
   } else {
     state.pendingDynamicLayout = false
     updateLayoutStatus()
-    elements.preview.innerHTML = html
+    renderClassicPreview(html)
   }
 
   renderStats(prepared, prepareDuration, renderDuration)

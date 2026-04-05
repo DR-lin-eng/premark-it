@@ -745,6 +745,20 @@ body.presentation-mode .presentation-toolbar {
   overflow: visible;
 }
 
+.rendered-article {
+  width: min(100%, 880px);
+  margin: 0 auto;
+  padding: 6px 4px 24px;
+}
+
+.rendered-article > * {
+  margin-block: 0;
+}
+
+.rendered-article > * + * {
+  margin-top: 1rem;
+}
+
 .rendered-view-pending {
   position: relative;
 }
@@ -779,10 +793,19 @@ body.presentation-mode .presentation-toolbar {
   font-family: var(--font-system);
 }
 
+.rendered-article .rendered-lede,
 .rendered-view p,
 .rendered-view li {
   font-size: 16px;
   line-height: 1.65;
+}
+
+.rendered-article .rendered-lede {
+  margin-top: 14px;
+  font-size: 20px;
+  line-height: 1.5;
+  font-weight: 500;
+  color: var(--label-strong);
 }
 
 .rendered-view h1 {
@@ -797,10 +820,37 @@ body.presentation-mode .presentation-toolbar {
   letter-spacing: -0.03em;
 }
 
-.rendered-view blockquote {
+.rendered-view h3 {
+  font-size: 22px;
+  line-height: 1.18;
+  letter-spacing: -0.02em;
+}
+
+.rendered-article .rendered-section-title {
+  position: relative;
+  margin-top: 3rem;
+  padding-top: 2.1rem;
+}
+
+.rendered-article .rendered-section-title::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background:
+    linear-gradient(90deg, rgba(60, 60, 67, 0), rgba(60, 60, 67, 0.16), rgba(60, 60, 67, 0));
+}
+
+.rendered-view blockquote,
+.rendered-article .rendered-note {
   margin: 1.2rem 0;
-  padding: 0.45rem 0 0.45rem 1rem;
+  padding: 1rem 1.05rem 1rem 1.15rem;
   border-left: 3px solid rgba(10, 132, 255, 0.3);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.62);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.78);
   color: var(--text-soft);
 }
 
@@ -809,6 +859,19 @@ body.presentation-mode .presentation-toolbar {
   max-width: 100%;
   height: auto;
   border-radius: 20px;
+}
+
+.rendered-article .rendered-figure-block {
+  margin-top: 1.4rem;
+  padding: 12px;
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.62);
+  border: 1px solid rgba(255, 255, 255, 0.66);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.76), var(--shadow-sm);
+}
+
+.rendered-article .rendered-figure-block img {
+  width: 100%;
 }
 
 .rendered-view pre,
@@ -822,6 +885,21 @@ body.presentation-mode .presentation-toolbar {
   line-height: 1.6;
   white-space: pre-wrap;
   word-break: break-word;
+}
+
+.rendered-article .rendered-code-shell,
+.rendered-article .rendered-table-shell {
+  margin-top: 1.4rem;
+  padding: 12px;
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.62);
+  border: 1px solid rgba(255, 255, 255, 0.66);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.76), var(--shadow-sm);
+}
+
+.rendered-article .rendered-code-shell pre,
+.rendered-article .rendered-table-shell table {
+  margin: 0;
 }
 
 .rendered-view table {
@@ -846,6 +924,19 @@ body.presentation-mode .presentation-toolbar {
 
 .rendered-view thead th {
   background: rgba(118, 118, 128, 0.08);
+}
+
+.rendered-article .rendered-list {
+  margin-top: 1.15rem;
+  padding: 0.9rem 1rem 0.95rem 1.45rem;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.58);
+  border: 1px solid rgba(255, 255, 255, 0.66);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.76);
+}
+
+.rendered-article .rendered-list li + li {
+  margin-top: 0.45rem;
 }
 
 .rendered-view tr:last-child td,
@@ -1133,6 +1224,52 @@ body.presentation-mode .presentation-toolbar {
   color: #a11e16;
 }
 
+.engine-shell {
+  max-width: 1520px;
+}
+
+.engine-meta {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.engine-layout {
+  display: grid;
+  grid-template-columns: minmax(320px, 0.86fr) minmax(0, 1.14fr);
+  gap: 18px;
+  align-items: start;
+}
+
+.engine-controls,
+.engine-preview-panel,
+.engine-usage-panel {
+  min-width: 0;
+}
+
+.engine-controls-grid {
+  margin-top: 18px;
+}
+
+.engine-description-card {
+  margin-top: 16px;
+}
+
+.engine-preview-host {
+  margin-top: 18px;
+  min-height: 760px;
+}
+
+.engine-preview-host .premark-editorial-root {
+  min-height: 760px;
+}
+
+.engine-usage-panel {
+  margin-top: 18px;
+}
+
+.engine-usage-panel .code-view {
+  margin-top: 16px;
+}
+
 body.presentation-mode .hero,
 body.presentation-mode .editor-panel,
 body.presentation-mode .workspace-handle,
@@ -1196,6 +1333,10 @@ body.presentation-mode .view-card {
   .controls-grid,
   .template-gallery,
   .hero-meta {
+    grid-template-columns: 1fr;
+  }
+
+  .engine-layout {
     grid-template-columns: 1fr;
   }
 

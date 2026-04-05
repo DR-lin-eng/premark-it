@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Premark-It Editorial Engine</title>
+    <meta
+      name="description"
+      content="Low-code browser integration for Premark-It editorial rendering, with multiple capability showcases inspired by pretext."
+    >
+    <link rel="stylesheet" href="./styles.css">
+    <script src="./assets/premark-it-editorial.js"></script>
+    <script type="module" src="./assets/editorial-engine.js"></script>
+  </head>
+  <body>
+    <main class="page-shell engine-shell">
+      <header class="hero">
+        <div class="hero-copy">
+          <p class="eyebrow">Editorial Engine</p>
+          <h1>One script, then Markdown becomes a browser layout.</h1>
+          <p class="hero-text">
+            This page exposes a low-code browser integration for <code>PremarkItEditorial</code>.
+            Pick a capability, inspect the live result, then copy either the custom-element HTML
+            or the function-based snippet.
+          </p>
+          <div class="hero-pills">
+            <span class="hero-pill">Custom element</span>
+            <span class="hero-pill">Function wrapper</span>
+            <span class="hero-pill">Multiple capabilities</span>
+          </div>
+        </div>
+        <div class="hero-meta engine-meta">
+          <div class="meta-card">
+            <span class="meta-label">Script</span>
+            <strong><code>premark-it-editorial.js</code></strong>
+          </div>
+          <div class="meta-card">
+            <span class="meta-label">Global</span>
+            <strong><code>window.PremarkItEditorial</code></strong>
+          </div>
+          <div class="meta-card">
+            <span class="meta-label">Low code</span>
+            <strong><code>&lt;premark-editorial&gt;</code></strong>
+          </div>
+        </div>
+      </header>
+
+      <section class="engine-layout">
+        <aside class="panel engine-controls">
+          <div class="panel-header">
+            <div>
+              <p class="panel-kicker">Capability</p>
+              <h2>Selector</h2>
+            </div>
+          </div>
+
+          <div class="controls-grid engine-controls-grid">
+            <label class="control">
+              <span>Capability</span>
+              <select id="capability-select">
+                <option value="editorial-engine">Editorial Engine</option>
+                <option value="dynamic-layout">Dynamic Layout</option>
+                <option value="markdown-chat">Markdown Chat</option>
+                <option value="rich-text">Rich Text</option>
+                <option value="bubbles">Bubbles</option>
+                <option value="masonry">Masonry</option>
+                <option value="accordion">Accordion</option>
+                <option value="justification">Justification</option>
+                <option value="ascii">ASCII</option>
+              </select>
+            </label>
+
+            <label class="control">
+              <span>Usage Mode</span>
+              <select id="usage-mode">
+                <option value="custom-element">Custom Element</option>
+                <option value="function-api">Function API</option>
+              </select>
+            </label>
+
+            <label class="control">
+              <span>Locale</span>
+              <select id="engine-locale">
+                <option value="en">English</option>
+                <option value="zh-CN">简体中文</option>
+              </select>
+            </label>
+          </div>
+
+          <div class="editor-hint-card engine-description-card">
+            <div class="editor-hint-copy">
+              <p class="editor-hint-kicker">Description</p>
+              <p id="capability-description" class="editor-hint-body"></p>
+            </div>
+          </div>
+
+          <textarea
+            id="engine-markdown"
+            spellcheck="false"
+            aria-label="Capability markdown source"
+          ></textarea>
+        </aside>
+
+        <section class="panel engine-preview-panel">
+          <div class="panel-header">
+            <div>
+              <p class="panel-kicker">Preview</p>
+              <h2 id="capability-title">Editorial Engine</h2>
+            </div>
+          </div>
+          <div id="engine-preview-host" class="engine-preview-host"></div>
+        </section>
+      </section>
+
+      <section class="panel engine-usage-panel">
+        <div class="panel-header">
+          <div>
+            <p class="panel-kicker">Usage</p>
+            <h2>Embed HTML</h2>
+          </div>
+        </div>
+        <p id="usage-summary" class="output-summary"></p>
+        <pre id="usage-code" class="code-view"></pre>
+      </section>
+    </main>
+  </body>
+</html>

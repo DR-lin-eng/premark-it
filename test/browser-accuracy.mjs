@@ -125,6 +125,28 @@ async function run() {
         if (rectReadsAfterResize !== rectReadsAfterPrepare) {
           throw new Error(`resize triggered sync DOM reads (${rectReadsAfterPrepare} -> ${rectReadsAfterResize})`)
         }
+
+        await page.goto(`${baseUrl}/editorial-engine.html`, { waitUntil: 'networkidle' })
+        await page.waitForSelector('#engine-preview-host .premark-editorial-root')
+        await page.selectOption('#capability-select', 'masonry')
+        await page.waitForSelector('#engine-preview-host .premark-masonry-card')
+        await page.selectOption('#usage-mode', 'function-api')
+
+        const editorialEngine = await page.evaluate(() => {
+          return {
+            hasUsage: Boolean(document.querySelector('#usage-code')?.textContent?.includes('PremarkItEditorial.render')),
+            hasCustomElementUsage: Boolean(document.querySelector('#usage-code')?.textContent?.includes('capability:')),
+            previewTitle: document.querySelector('#capability-title')?.textContent || ''
+          }
+        })
+
+        if (!editorialEngine.hasUsage) {
+          throw new Error('editorial engine usage snippet did not render')
+        }
+
+        if (!editorialEngine.previewTitle) {
+          throw new Error('editorial engine preview title missing')
+        }
       } catch (error) {
         const diagnostics = [
           pageErrors.length ? `pageerror: ${pageErrors.join(' | ')}` : '',

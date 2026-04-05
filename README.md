@@ -36,12 +36,49 @@ The repository also now ships an experimental browser-only text layout module at
 
 This module is designed for prepare-time measurement plus arithmetic-only resize work, closer to the architecture used by `pretext`.
 
+For browser embedding, the demo build now also produces a low-code global bundle at `demo-dist/assets/premark-it-editorial.js`. It exposes `window.PremarkItEditorial`, including:
+
+- `PremarkItEditorial.render(target, markdown, options)`
+- `PremarkItEditorial.md\`\``
+- `PremarkItEditorial.upgradeAll()`
+
+Low-code custom-element usage:
+
+```html
+<script src="./assets/premark-it-editorial.js"></script>
+
+<premark-editorial capability="editorial-engine" locale="zh-CN">
+# 标题
+
+这里是一段 Markdown，它会在浏览器里直接排成 editorial 风格。
+</premark-editorial>
+```
+
+Function-wrapper usage:
+
+```html
+<div id="hero"></div>
+<script src="./assets/premark-it-editorial.js"></script>
+<script>
+  PremarkItEditorial.render(
+    '#hero',
+    PremarkItEditorial.md`
+# Hello
+
+This block is rendered directly from Markdown.
+`,
+    { capability: 'dynamic-layout', locale: 'en' }
+  )
+</script>
+```
+
 ## GitHub demo
 
 The repository now includes:
 
 - a browser demo in [`demo/index.html`](./demo/index.html)
 - an accuracy harness in [`demo/accuracy.html`](./demo/accuracy.html)
+- a low-code capability showcase in [`demo/editorial-engine.html`](./demo/editorial-engine.html)
 - a GitHub Pages workflow in [`.github/workflows/demo-pages.yml`](./.github/workflows/demo-pages.yml)
 
 The demo supports i18n for English and Simplified Chinese, defaults to the browser locale, and allows manual switching in the UI. Dynamic mode now renders a continuous editorial flow with a side rail for figures/notes instead of the previous card waterfall.
