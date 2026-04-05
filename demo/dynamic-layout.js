@@ -7,53 +7,52 @@ import {
   profilePrepare
 } from '../prelayout/index.mjs'
 
-const FONT_FAMILY_UI = '"Space Grotesk", "Avenir Next", "Segoe UI", sans-serif'
-const FONT_FAMILY_DISPLAY = '"Fraunces", Georgia, serif'
-const FONT_FAMILY_BODY = '"Source Serif 4", Georgia, serif'
-const FONT_FAMILY_MONO = '"IBM Plex Mono", ui-monospace, monospace'
+const FONT_FAMILY_UI = '-apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", Arial, sans-serif'
+const FONT_FAMILY_DISPLAY = '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", Arial, sans-serif'
+const FONT_FAMILY_BODY = '-apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Arial, sans-serif'
+const FONT_FAMILY_MONO = '"SF Mono", SFMono-Regular, Menlo, Monaco, Consolas, monospace'
 const WORKSPACE_HANDLE_WIDTH = 18
 
 const TEXT_STYLES = {
   heading: {
     fontFamily: FONT_FAMILY_DISPLAY,
-    fontSize: 54,
-    lineHeight: 62,
-    fontWeight: 600,
-    letterSpacing: -0.52
+    fontSize: 34,
+    lineHeight: 40,
+    fontWeight: 700,
+    letterSpacing: -0.48
   },
   lede: {
     fontFamily: FONT_FAMILY_BODY,
-    fontSize: 28,
-    lineHeight: 42,
+    fontSize: 22,
+    lineHeight: 30,
     fontWeight: 500,
     letterSpacing: 0
   },
   paragraph: {
     fontFamily: FONT_FAMILY_BODY,
-    fontSize: 20,
-    lineHeight: 34,
+    fontSize: 17,
+    lineHeight: 27,
     fontWeight: 400,
     letterSpacing: 0
   },
   list: {
     fontFamily: FONT_FAMILY_BODY,
-    fontSize: 19,
-    lineHeight: 32,
+    fontSize: 17,
+    lineHeight: 27,
     fontWeight: 400,
     letterSpacing: 0
   },
   quote: {
     fontFamily: FONT_FAMILY_BODY,
-    fontSize: 18,
-    lineHeight: 30,
+    fontSize: 15,
+    lineHeight: 24,
     fontWeight: 500,
-    italic: true,
     letterSpacing: 0
   },
   code: {
     fontFamily: FONT_FAMILY_MONO,
-    fontSize: 14,
-    lineHeight: 22,
+    fontSize: 13,
+    lineHeight: 20,
     fontWeight: 500,
     whiteSpace: 'pre-wrap',
     tabSize: 2
@@ -61,14 +60,14 @@ const TEXT_STYLES = {
   table: {
     fontFamily: FONT_FAMILY_BODY,
     fontSize: 15,
-    lineHeight: 24,
+    lineHeight: 22,
     fontWeight: 500,
     letterSpacing: 0
   },
   caption: {
     fontFamily: FONT_FAMILY_UI,
     fontSize: 12,
-    lineHeight: 18,
+    lineHeight: 16,
     fontWeight: 500,
     letterSpacing: 0.12
   }
