@@ -41,6 +41,12 @@ jobs:
       - name: Build demo
         run: npm run build:demo
 
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium firefox webkit
+
+      - name: Run browser accuracy tests
+        run: npm run test:browser
+
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:

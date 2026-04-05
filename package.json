@@ -11,13 +11,15 @@
   "files": [
     "index.mjs",
     "lib",
+    "prelayout",
     "LICENSE",
     "README.md",
     "demo"
   ],
   "scripts": {
-    "test": "mocha test/markdown-it.mjs test/commonmark.mjs test/misc.mjs test/ruler.mjs test/token.mjs test/prepare.mjs test/demo-i18n.mjs test/demo-layout.mjs",
+    "test": "mocha test/markdown-it.mjs test/commonmark.mjs test/misc.mjs test/ruler.mjs test/token.mjs test/prepare.mjs test/prelayout.mjs test/demo-i18n.mjs test/demo-layout.mjs",
     "test:stress": "mocha test/pathological.mjs",
+    "test:browser": "node test/browser-accuracy.mjs",
     "build:demo": "node scripts/build-demo.mjs"
   },
   "keywords": [
@@ -41,6 +43,7 @@
     "markdown-it-for-inline": "^2.0.1",
     "markdown-it-testgen": "^0.1.3",
     "mocha": "^10.8.2",
-    "needle": "^3.3.1"
+    "needle": "^3.3.1",
+    "playwright": "^1.59.1"
   }
 }

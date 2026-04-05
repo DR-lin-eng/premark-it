@@ -27,11 +27,28 @@ await build({
   minify: true
 })
 
+await build({
+  entryPoints: [path.join(demoDir, 'accuracy.js')],
+  outfile: path.join(assetsDir, 'accuracy.js'),
+  bundle: true,
+  format: 'esm',
+  platform: 'browser',
+  target: ['es2022'],
+  sourcemap: false,
+  minify: true
+})
+
 const htmlTemplate = await readFile(path.join(demoDir, 'index.html'), 'utf8')
+const accuracyTemplate = await readFile(path.join(demoDir, 'accuracy.html'), 'utf8')
 
 await writeFile(
   path.join(outDir, 'index.html'),
   htmlTemplate.replaceAll('__VERSION__', packageJson.version)
+)
+
+await writeFile(
+  path.join(outDir, 'accuracy.html'),
+  accuracyTemplate.replaceAll('__VERSION__', packageJson.version)
 )
 
 await copyFile(

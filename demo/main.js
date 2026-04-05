@@ -15,7 +15,8 @@ const dynamicPrepareCache = {
   textCache: new Map(),
   sourceBlockCache: new Map(),
   semanticCache: new Map(),
-  blockCache: new Map(),
+  preparedBlockCache: new Map(),
+  spreadCache: new Map(),
   documentState: {
     sourceBlocks: [],
     resolvedSourceBlocks: []
@@ -32,8 +33,8 @@ const MESSAGES = {
     documentTitle: 'Premark-It Demo',
     metaDescription: 'A GitHub Pages demo for the fully compatible markdown-it rewrite with a Pretext-inspired prepare() cache.',
     eyebrow: 'GitHub Pages Demo',
-    heroTitle: 'markdown-it compatibility, live in the browser.',
-    heroText: 'This playground runs the local rewrite in-browser, shows rendered HTML, and demonstrates the extra <code>prepare()</code> cache layer.',
+    heroTitle: 'A markdown-it parser, now with a browser text engine.',
+    heroText: 'This playground runs the local rewrite in-browser, shows rendered HTML, and demonstrates an experimental <code>prelayout</code> engine with prepare-time measurement and arithmetic-only resize work.',
     heroPills: {
       prepare: 'Prepare-first',
       dynamic: 'Dynamic layout',
@@ -110,12 +111,13 @@ const MESSAGES = {
     },
     outputSummaries: {
       classic: 'Classic rendering shows the direct HTML flow for the selected template.',
-      dynamicIdle: 'Dynamic mode is preparing a measured layout pass in the background.',
-      dynamicReady: 'Dynamic layout is active and balancing content using cached prepare-time measurements.'
+      dynamicIdle: 'Dynamic mode is preparing a browser-calibrated editorial layout in the background.',
+      dynamicReady: 'Dynamic layout is active and flowing text with prepared measurements, line walking, and rail placement.'
     },
     presentationToolbarLabel: 'Presentation Mode',
     copyPresentLink: 'Copy Preview Link',
     copyPresentLinkSuccess: 'Presentation link copied.',
+    accuracyLab: 'Accuracy Lab',
     presentEnter: 'Present Preview',
     presentExit: 'Exit Preview',
     copyHtml: 'Copy HTML',
@@ -130,7 +132,9 @@ const MESSAGES = {
       inlineTokens: 'Inline tokens',
       timing: 'Timing',
       layout: 'Layout',
-      reuse: 'Reuse'
+      reuse: 'Reuse',
+      engine: 'Engine',
+      correction: 'Correction'
     },
     sampleTemplates: {
       demo: `# Premark-It Demo
@@ -142,6 +146,7 @@ This playground runs the **local parser build** and shows how the extra \`prepar
 - CommonMark-compatible output
 - Plugin-friendly core API
 - Reusable token preparation
+- Mixed scripts, emoji 😀🙂🚀, and browser-grounded layout
 
 ## Table support
 
@@ -166,6 +171,8 @@ console.log(md.render(prepared));
 \`\`\`
 
 Inline HTML stays escaped by default: <span>safe</span>.
+
+Arabic inline sample: English beside مرحبا بالعالم should still remain readable.
 `,
       article: `# Designing For Flow
 
@@ -231,8 +238,8 @@ console.log(md.render(prepared));
     documentTitle: 'Premark-It 演示',
     metaDescription: '一个运行在 GitHub Pages 上的演示页，用于展示这版完全兼容 markdown-it 的重写实现和额外的 prepare() 缓存层。',
     eyebrow: 'GitHub Pages 演示',
-    heroTitle: '在浏览器里直接体验 markdown-it 兼容实现。',
-    heroText: '这个演示会在浏览器中运行本地重写实现，展示渲染后的 HTML，并演示额外的 <code>prepare()</code> 缓存层。',
+    heroTitle: '一个带浏览器文本引擎的 markdown-it 兼容实现。',
+    heroText: '这个演示会在浏览器中运行本地重写实现，展示渲染后的 HTML，并演示实验性的 <code>prelayout</code> 引擎如何在 prepare 阶段测量文本并在 resize 时只做算术重排。',
     heroPills: {
       prepare: '先 prepare',
       dynamic: '动态布局',
@@ -309,12 +316,13 @@ console.log(md.render(prepared));
     },
     outputSummaries: {
       classic: '经典模式会直接展示当前模板对应的 HTML 流式渲染结果。',
-      dynamicIdle: '动态模式正在后台准备带度量信息的版式结果。',
-      dynamicReady: '动态布局已启用，并会基于 prepare 阶段缓存的度量结果平衡内容。'
+      dynamicIdle: '动态模式正在后台准备经过浏览器校准的 editorial 版式。',
+      dynamicReady: '动态布局已启用，并会基于 prepare 阶段的测量、行走和侧栏编排输出连续正文流。'
     },
     presentationToolbarLabel: '展示模式',
     copyPresentLink: '复制展示链接',
     copyPresentLinkSuccess: '展示链接已复制。',
+    accuracyLab: '精度实验室',
     presentEnter: '全屏预览',
     presentExit: '退出预览',
     copyHtml: '复制 HTML',
@@ -329,7 +337,9 @@ console.log(md.render(prepared));
       inlineTokens: '行内令牌',
       timing: '耗时',
       layout: '布局',
-      reuse: '复用'
+      reuse: '复用',
+      engine: '引擎',
+      correction: '校准'
     },
     sampleTemplates: {
       demo: `# Premark-It 演示
@@ -341,6 +351,7 @@ console.log(md.render(prepared));
 - CommonMark 兼容输出
 - 插件友好的核心 API
 - 可复用的 token 预处理
+- 中英混排、emoji 😀🙂🚀 与浏览器校准布局
 
 ## 表格支持
 
@@ -365,6 +376,8 @@ console.log(md.render(prepared));
 \`\`\`
 
 默认情况下，内联 HTML 仍会被转义：<span>安全</span>。
+
+阿拉伯语混排示例：English beside مرحبا بالعالم 应该仍然保持稳定阅读。
 `,
       article: `# 为流动感而设计
 
@@ -738,7 +751,17 @@ function renderStats(prepared, prepareDuration, renderDuration) {
   const labels = currentMessages().stats
   const reuseValue =
     state.layoutMode === 'dynamic' && state.dynamicPrepared?.cacheStats
-      ? `P${state.dynamicPrepared.cacheStats.reusedPositionalBlocks} C${state.dynamicPrepared.cacheStats.reusedContentBlocks} M${state.dynamicPrepared.cacheStats.reusedMeasuredBlocks}`
+      ? `P${state.dynamicPrepared.cacheStats.reusedPositionalBlocks} C${state.dynamicPrepared.cacheStats.reusedContentBlocks} B${state.dynamicPrepared.cacheStats.reusedPreparedBlocks}`
+      : 'n/a'
+  const engineValue =
+    state.layoutMode === 'dynamic' && state.dynamicPrepared?.measurementProfile
+      ? state.dynamicPrepared.measurementProfile.engineProfile
+      : 'n/a'
+  const correctionValue =
+    state.layoutMode === 'dynamic' && state.dynamicPrepared?.measurementProfile
+      ? (state.dynamicPrepared.measurementProfile.correctionApplied
+          ? (state.dynamicPrepared.measurementProfile.domCalibrationUsed ? 'DOM+Canvas' : 'Canvas')
+          : 'none')
       : 'n/a'
   const cards = [
     {
@@ -762,6 +785,14 @@ function renderStats(prepared, prepareDuration, renderDuration) {
     {
       label: labels.reuse,
       value: reuseValue
+    },
+    {
+      label: labels.engine,
+      value: engineValue
+    },
+    {
+      label: labels.correction,
+      value: correctionValue
     },
     {
       label: labels.timing,
@@ -909,7 +940,7 @@ function pagePaddingForViewport() {
 }
 
 function currentPageWidth() {
-  return Math.min(1440, window.innerWidth - pagePaddingForViewport() * 2)
+  return Math.min(1520, window.innerWidth - pagePaddingForViewport() * 2)
 }
 
 function setOutputRatio(nextRatio) {
@@ -944,31 +975,31 @@ function stopWorkspaceDrag() {
 function renderDynamicPreview(layout) {
   elements.preview.innerHTML = `
     <div class="dynamic-stage" style="height:${Math.ceil(layout.height)}px">
-      ${layout.cards.map((card) => `
+      ${layout.items.map((item) => `
         <section
-          class="${card.className}"
-          data-card-key="${card.key}"
-          style="left:${Math.round(card.x)}px;top:${Math.round(card.y)}px;width:${Math.round(card.width)}px;height:${Math.round(card.height)}px"
+          class="${item.className}"
+          data-item-key="${item.key}"
+          style="left:${Math.round(item.x)}px;top:${Math.round(item.y)}px;width:${Math.round(item.width)}px;height:${Math.round(item.height)}px"
         >
-          ${card.html}
+          ${item.html}
         </section>
       `).join('')}
     </div>
   `
 
-  const nextMap = new Map(layout.cards.map((card) => [card.key, card]))
+  const nextMap = new Map(layout.items.map((item) => [item.key, item]))
   const stage = elements.preview.querySelector?.('.dynamic-stage')
   if (stage) {
-    const cardNodes = stage.querySelectorAll?.('[data-card-key]') || []
-    cardNodes.forEach((node) => {
-      const key = node.dataset.cardKey
+    const itemNodes = stage.querySelectorAll?.('[data-item-key]') || []
+    itemNodes.forEach((node) => {
+      const key = node.dataset.itemKey
       const previous = state.lastDynamicCardMap.get(key)
       const next = nextMap.get(key)
 
       if (!previous || !next) {
-        node.classList.add('dynamic-card-entering')
+        node.classList.add('stage-item-entering')
         requestAnimationFrame(() => {
-          node.classList.remove('dynamic-card-entering')
+          node.classList.remove('stage-item-entering')
         })
         return
       }
@@ -981,14 +1012,14 @@ function renderDynamicPreview(layout) {
       }
 
       node.style.transform = `translate(${deltaX}px, ${deltaY}px)`
-      node.classList.add('dynamic-card-animating')
+      node.classList.add('stage-item-animating')
 
       requestAnimationFrame(() => {
         node.style.transform = ''
       })
 
       const cleanup = () => {
-        node.classList.remove('dynamic-card-animating')
+        node.classList.remove('stage-item-animating')
         node.removeEventListener('transitionend', cleanup)
       }
 
@@ -1030,7 +1061,8 @@ async function ensureDynamicPrepared(source, md, renderToken) {
   const dynamicPrepared = await prepareDynamicDocumentFromSource({
     source,
     md,
-    cache: dynamicPrepareCache
+    cache: dynamicPrepareCache,
+    locale: state.locale
   })
 
   if (renderToken !== state.renderToken) {

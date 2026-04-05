@@ -355,7 +355,7 @@ describe('Demo i18n and layout', function () {
     assert.include(env.workspace.className, 'workspace-dynamic-mode')
     assert.include(env.preview.className, 'rendered-view-dynamic-mode')
     assert.include(env.preview.innerHTML, 'dynamic-stage')
-    assert.include(env.preview.innerHTML, 'dynamic-card')
+    assert.include(env.preview.innerHTML, 'stage-item')
 
     env.layoutBalance.value = '62'
     env.layoutBalance.dispatch('change')
