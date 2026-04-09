@@ -67,6 +67,7 @@ const TEXT_STYLE_MONO = {
 
 const CUSTOM_ELEMENT_ATTRIBUTES = [
   'markdown',
+  'source',
   'capability',
   'locale',
   'preset',
@@ -78,6 +79,8 @@ const CUSTOM_ELEMENT_ATTRIBUTES = [
   'output-ratio',
   'dynamic'
 ]
+
+const SCRIPT_SELECTOR = 'script[type="text/premark-editorial"], template[data-premark-editorial]'
 
 function md(strings, ...values) {
   return strings.reduce((result, chunk, index) => {
@@ -131,6 +134,7 @@ function parseBooleanAttribute(value, fallback = false) {
 
 function readElementOptions(element) {
   return {
+    source: element.getAttribute('source') || undefined,
     capability: element.getAttribute('capability') || undefined,
     locale: element.getAttribute('locale') || undefined,
     preset: element.getAttribute('preset') || undefined,
@@ -171,6 +175,18 @@ function plainTextFromMarkdown(parser, markdownSource) {
 
 function readMarkdownSource(source) {
   if (!source) return ''
+
+  const selector = source.getAttribute?.('source')
+  if (selector) {
+    const linked = document.querySelector(selector)
+    if (linked) {
+      const nested = linked.querySelector?.('script[type="text/markdown"], template[data-markdown]')
+      if (nested) {
+        return nested.textContent || ''
+      }
+      return linked.textContent || ''
+    }
+  }
 
   const scriptLike = source.querySelector?.('script[type="text/markdown"], template[data-markdown]')
   if (scriptLike) {
@@ -742,6 +758,34 @@ function readElementMarkdown(element) {
   return readMarkdownSource(element)
 }
 
+function readScriptOptions(node) {
+  return {
+    source: node.getAttribute?.('source') || undefined,
+    capability: node.getAttribute?.('capability') || undefined,
+    locale: node.getAttribute?.('locale') || undefined,
+    preset: node.getAttribute?.('preset') || undefined,
+    html: parseBooleanAttribute(node.getAttribute?.('html'), undefined),
+    linkify: parseBooleanAttribute(node.getAttribute?.('linkify'), undefined),
+    typographer: parseBooleanAttribute(node.getAttribute?.('typographer'), undefined),
+    breaks: parseBooleanAttribute(node.getAttribute?.('breaks'), undefined),
+    xhtmlOut: parseBooleanAttribute(node.getAttribute?.('xhtml-out'), undefined),
+    outputRatio: node.hasAttribute?.('output-ratio')
+      ? Number(node.getAttribute('output-ratio'))
+      : undefined,
+    useDynamic: node.hasAttribute?.('dynamic')
+      ? parseBooleanAttribute(node.getAttribute('dynamic'), true)
+      : undefined,
+    useShadow: parseBooleanAttribute(node.getAttribute?.('shadow'), true)
+  }
+}
+
+function createHostAfter(node) {
+  const host = document.createElement('div')
+  host.className = 'premark-editorial-autohost'
+  node.insertAdjacentElement('afterend', host)
+  return host
+}
+
 function createController(target, initialMarkdown, initialOptions = {}) {
   const host = resolveTarget(target)
   const options = mergeOptions(initialOptions)
@@ -928,9 +972,97 @@ function upgradeElement(element) {
   return controller
 }
 
+function upgradeScriptNode(node) {
+  if (node.__premarkController) {
+    return node.__premarkController
+  }
+
+  const host = createHostAfter(node)
+  const markdownSource = node.textContent || ''
+  const controller = createController(host, markdownSource, {
+    ...readScriptOptions(node),
+    useShadow: parseBooleanAttribute(node.getAttribute?.('shadow'), false)
+  })
+
+  node.__premarkController = controller
+  node.__premarkHost = host
+  return controller
+}
+
 function upgradeAll(root = document) {
   const elements = root.querySelectorAll?.('premark-editorial, [data-premark-editorial]') || []
-  return Array.from(elements).map(upgradeElement)
+  const scriptNodes = root.querySelectorAll?.(SCRIPT_SELECTOR) || []
+  return [
+    ...Array.from(elements).map(upgradeElement),
+    ...Array.from(scriptNodes).map(upgradeScriptNode)
+  ]
+}
+
+function capabilityMethodMap() {
+  return {
+    'editorial-engine': 'editorial',
+    'dynamic-layout': 'dynamicLayout',
+    'markdown-chat': 'chat',
+    'rich-text': 'richText',
+    'inline-flow': 'inlineFlow',
+    bubbles: 'bubbles',
+    masonry: 'masonry',
+    accordion: 'accordion',
+    justification: 'justification',
+    ascii: 'ascii',
+    'line-break': 'lineBreak',
+    'prepare-profile': 'prepareProfile'
+  }
+}
+
+function listCapabilities() {
+  return Object.entries(capabilityMethodMap()).map(([capability, method]) => ({
+    capability,
+    method
+  }))
+}
+
+function snippet(markdownSource, options = {}) {
+  const merged = mergeOptions(options)
+  const method = capabilityMethodMap()[merged.capability] || 'render'
+  return `<script src="./assets/premark-it-editorial.js"></script>
+<script>
+  PremarkItEditorial.${method}(
+    '#target',
+    PremarkItEditorial.md\`
+${String(markdownSource ?? '')}
+\`,
+    { locale: '${merged.locale}' }
+  )
+</script>`
+}
+
+function installObserver() {
+  if (typeof MutationObserver !== 'function') {
+    return null
+  }
+
+  const observer = new MutationObserver((records) => {
+    records.forEach((record) => {
+      record.addedNodes.forEach((node) => {
+        if (node.nodeType !== 1) return
+        if (node.matches?.('premark-editorial, [data-premark-editorial]')) {
+          upgradeElement(node)
+        }
+        if (node.matches?.(SCRIPT_SELECTOR)) {
+          upgradeScriptNode(node)
+        }
+        upgradeAll(node)
+      })
+    })
+  })
+
+  observer.observe(document.documentElement, {
+    childList: true,
+    subtree: true
+  })
+
+  return observer
 }
 
 class PremarkEditorialElement extends HTMLElement {
@@ -967,6 +1099,9 @@ const api = {
   render,
   create: createController,
   upgradeAll,
+  upgradeScriptNode,
+  listCapabilities,
+  snippet,
   editorial(target, markdownSource, options = {}) {
     return render(target, markdownSource, { ...options, capability: 'editorial-engine' })
   },
@@ -1010,9 +1145,11 @@ if (typeof window !== 'undefined') {
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', () => {
       upgradeAll()
+      installObserver()
     }, { once: true })
   } else {
     upgradeAll()
+    installObserver()
   }
 }
 

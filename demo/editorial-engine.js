@@ -160,10 +160,12 @@ const elements = {
   locale: document.querySelector('#engine-locale'),
   markdown: document.querySelector('#engine-markdown'),
   previewHost: document.querySelector('#engine-preview-host'),
+  capabilityGallery: document.querySelector('#capability-gallery'),
   capabilityTitle: document.querySelector('#capability-title'),
   capabilityDescription: document.querySelector('#capability-description'),
   usageSummary: document.querySelector('#usage-summary'),
-  usageCode: document.querySelector('#usage-code')
+  usageCode: document.querySelector('#usage-code'),
+  copyUsage: document.querySelector('#copy-usage')
 }
 
 let controller = null
@@ -193,7 +195,21 @@ function renderUsage() {
   locale="${elements.locale.value}"
 >
 ${markdownSource}
-</premark-editorial>`
+    </premark-editorial>`
+    return
+  }
+
+  if (usageMode === 'auto-script') {
+    elements.usageSummary.textContent = 'Use a special script block and let PremarkItEditorial auto-upgrade it after load.'
+    elements.usageCode.textContent = `<script src="./assets/premark-it-editorial.js"></script>
+
+<script
+  type="text/premark-editorial"
+  capability="${capability.libraryCapability}"
+  locale="${elements.locale.value}"
+>
+${markdownSource}
+</script>`
     return
   }
 
@@ -226,6 +242,57 @@ ${markdownSource}
 </script>`
 }
 
+function renderCapabilityGallery() {
+  elements.capabilityGallery.innerHTML = Object.entries(CAPABILITIES).map(([key, capability]) => {
+    return `
+      <button class="template-card ${elements.capability.value === key ? 'is-active' : ''}" type="button" data-capability-card="${key}">
+        <span class="template-card-kicker">${capability.libraryCapability}</span>
+        <strong class="template-card-title">${capability.title}</strong>
+        <span class="template-card-body">${capability.description}</span>
+      </button>
+    `
+  }).join('')
+
+  elements.capabilityGallery.querySelectorAll('[data-capability-card]').forEach((button) => {
+    button.addEventListener('click', () => {
+      elements.capability.value = button.dataset.capabilityCard
+      const capability = currentCapability()
+      elements.markdown.value = capability.markdown
+      renderPreview()
+    })
+  })
+}
+
+function syncUrlState() {
+  if (!window.history?.replaceState) {
+    return
+  }
+  const url = new URL(window.location.href)
+  url.searchParams.set('capability', elements.capability.value)
+  url.searchParams.set('usage', elements.usageMode.value)
+  url.searchParams.set('locale', elements.locale.value)
+  window.history.replaceState({}, '', url)
+}
+
+function initializeFromUrl() {
+  const params = new URLSearchParams(window.location.search)
+  const capability = params.get('capability')
+  const usage = params.get('usage')
+  const locale = params.get('locale')
+
+  if (capability && CAPABILITIES[capability]) {
+    elements.capability.value = capability
+  }
+
+  if (usage && ['custom-element', 'function-api', 'auto-script'].includes(usage)) {
+    elements.usageMode.value = usage
+  }
+
+  if (locale && ['en', 'zh-CN'].includes(locale)) {
+    elements.locale.value = locale
+  }
+}
+
 function renderPreview() {
   const capability = currentCapability()
   elements.capabilityTitle.textContent = capability.title
@@ -242,7 +309,9 @@ function renderPreview() {
       useShadow: false
     }
   )
+  renderCapabilityGallery()
   renderUsage()
+  syncUrlState()
 }
 
 elements.capability.addEventListener('change', () => {
@@ -255,5 +324,21 @@ elements.usageMode.addEventListener('change', renderUsage)
 elements.locale.addEventListener('change', renderPreview)
 elements.markdown.addEventListener('input', renderPreview)
 
+elements.copyUsage.addEventListener('click', async () => {
+  try {
+    await navigator.clipboard.writeText(elements.usageCode.textContent)
+    elements.copyUsage.textContent = 'Copied'
+    setTimeout(() => {
+      elements.copyUsage.textContent = 'Copy Snippet'
+    }, 1200)
+  } catch {
+    elements.copyUsage.textContent = 'Unavailable'
+    setTimeout(() => {
+      elements.copyUsage.textContent = 'Copy Snippet'
+    }, 1200)
+  }
+})
+
+initializeFromUrl()
 elements.markdown.value = currentCapability().markdown
 renderPreview()

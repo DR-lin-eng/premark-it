@@ -41,6 +41,21 @@ For browser embedding, the demo build now also produces a low-code global bundle
 - `PremarkItEditorial.render(target, markdown, options)`
 - `PremarkItEditorial.md\`\``
 - `PremarkItEditorial.upgradeAll()`
+- `PremarkItEditorial.upgradeScriptNode(node)`
+- `PremarkItEditorial.editorial(...)`
+- `PremarkItEditorial.dynamicLayout(...)`
+- `PremarkItEditorial.chat(...)`
+- `PremarkItEditorial.richText(...)`
+- `PremarkItEditorial.inlineFlow(...)`
+- `PremarkItEditorial.bubbles(...)`
+- `PremarkItEditorial.masonry(...)`
+- `PremarkItEditorial.accordion(...)`
+- `PremarkItEditorial.justification(...)`
+- `PremarkItEditorial.ascii(...)`
+- `PremarkItEditorial.lineBreak(...)`
+- `PremarkItEditorial.prepareProfile(...)`
+- `PremarkItEditorial.listCapabilities()`
+- `PremarkItEditorial.snippet(markdown, options)`
 
 Low-code custom-element usage:
 
@@ -52,6 +67,38 @@ Low-code custom-element usage:
 
 这里是一段 Markdown，它会在浏览器里直接排成 editorial 风格。
 </premark-editorial>
+```
+
+Source-linked usage:
+
+```html
+<script src="./assets/premark-it-editorial.js"></script>
+
+<script id="story-source" type="text/markdown">
+# 标题
+
+这段 Markdown 会从独立节点中读取。
+</script>
+
+<premark-editorial
+  capability="dynamic-layout"
+  source="#story-source"
+></premark-editorial>
+```
+
+Auto-script usage:
+
+```html
+<script src="./assets/premark-it-editorial.js"></script>
+
+<script
+  type="text/premark-editorial"
+  capability="markdown-chat"
+  locale="en"
+>
+User: Hello
+Assistant: This block is auto-upgraded after the script bundle loads.
+</script>
 ```
 
 Function-wrapper usage:
@@ -68,6 +115,22 @@ Function-wrapper usage:
 This block is rendered directly from Markdown.
 `,
     { capability: 'dynamic-layout', locale: 'en' }
+  )
+</script>
+```
+
+Shortcut helper usage:
+
+```html
+<div id="chat"></div>
+<script src="./assets/premark-it-editorial.js"></script>
+<script>
+  PremarkItEditorial.chat(
+    '#chat',
+    PremarkItEditorial.md`
+User: Hello
+Assistant: This bubble layout is rendered from Markdown.
+`
   )
 </script>
 ```

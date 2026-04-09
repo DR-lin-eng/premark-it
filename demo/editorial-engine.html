@@ -78,6 +78,7 @@
               <select id="usage-mode">
                 <option value="custom-element">Custom Element</option>
                 <option value="function-api">Function API</option>
+                <option value="auto-script">Auto Script</option>
               </select>
             </label>
 
@@ -89,6 +90,8 @@
               </select>
             </label>
           </div>
+
+          <div id="capability-gallery" class="template-gallery engine-capability-gallery"></div>
 
           <div class="editor-hint-card engine-description-card">
             <div class="editor-hint-copy">
@@ -121,6 +124,7 @@
             <p class="panel-kicker">Usage</p>
             <h2>Embed HTML</h2>
           </div>
+          <button id="copy-usage" class="secondary-button" type="button">Copy Snippet</button>
         </div>
         <p id="usage-summary" class="output-summary"></p>
         <pre id="usage-code" class="code-view"></pre>
