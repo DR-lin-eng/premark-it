@@ -155,6 +155,7 @@ This is a good fit for docs, FAQs, and inline product explainers.`
 }
 
 const elements = {
+  search: document.querySelector('#capability-search'),
   capability: document.querySelector('#capability-select'),
   usageMode: document.querySelector('#usage-mode'),
   locale: document.querySelector('#engine-locale'),
@@ -162,13 +163,32 @@ const elements = {
   previewHost: document.querySelector('#engine-preview-host'),
   capabilityGallery: document.querySelector('#capability-gallery'),
   capabilityTitle: document.querySelector('#capability-title'),
+  capabilityMethod: document.querySelector('#capability-method'),
   capabilityDescription: document.querySelector('#capability-description'),
   usageSummary: document.querySelector('#usage-summary'),
   usageCode: document.querySelector('#usage-code'),
-  copyUsage: document.querySelector('#copy-usage')
+  copyUsage: document.querySelector('#copy-usage'),
+  usageStatus: document.querySelector('#usage-status'),
+  resetCapability: document.querySelector('#reset-capability'),
+  copyMarkdown: document.querySelector('#copy-markdown')
 }
 
 let controller = null
+
+const METHOD_MAP = {
+  'editorial-engine': 'editorial',
+  'dynamic-layout': 'dynamicLayout',
+  'markdown-chat': 'chat',
+  'rich-text': 'richText',
+  'inline-flow': 'inlineFlow',
+  bubbles: 'bubbles',
+  masonry: 'masonry',
+  accordion: 'accordion',
+  justification: 'justification',
+  ascii: 'ascii',
+  'line-break': 'lineBreak',
+  'prepare-profile': 'prepareProfile'
+}
 
 function currentCapability() {
   return CAPABILITIES[elements.capability.value]
@@ -185,6 +205,8 @@ function renderUsage() {
   const capability = currentCapability()
   const markdownSource = elements.markdown.value
   const usageMode = elements.usageMode.value
+  const convenienceMethod = METHOD_MAP[capability.libraryCapability] || 'render'
+  elements.capabilityMethod.textContent = `Shortcut helper: PremarkItEditorial.${convenienceMethod}()`
 
   if (usageMode === 'custom-element') {
     elements.usageSummary.textContent = 'Wrap Markdown directly inside a custom element and let the browser script auto-upgrade it.'
@@ -213,21 +235,6 @@ ${markdownSource}
     return
   }
 
-  const methodMap = {
-    'editorial-engine': 'editorial',
-    'dynamic-layout': 'dynamicLayout',
-    'markdown-chat': 'chat',
-    'rich-text': 'richText',
-    'inline-flow': 'inlineFlow',
-    bubbles: 'bubbles',
-    masonry: 'masonry',
-    accordion: 'accordion',
-    justification: 'justification',
-    ascii: 'ascii',
-    'line-break': 'lineBreak',
-    'prepare-profile': 'prepareProfile'
-  }
-  const convenienceMethod = methodMap[capability.libraryCapability] || 'render'
   elements.usageSummary.textContent = 'Use the global helper and the template-string wrapper for the lowest-code function-based integration.'
   elements.usageCode.textContent = `<div id="hero"></div>
 <script src="./assets/premark-it-editorial.js"></script>
@@ -243,7 +250,14 @@ ${markdownSource}
 }
 
 function renderCapabilityGallery() {
-  elements.capabilityGallery.innerHTML = Object.entries(CAPABILITIES).map(([key, capability]) => {
+  const query = elements.search.value.trim().toLowerCase()
+  const entries = Object.entries(CAPABILITIES).filter(([key, capability]) => {
+    if (!query) return true
+    const haystack = `${key} ${capability.title} ${capability.description} ${capability.libraryCapability}`.toLowerCase()
+    return haystack.includes(query)
+  })
+
+  elements.capabilityGallery.innerHTML = entries.map(([key, capability]) => {
     return `
       <button class="template-card ${elements.capability.value === key ? 'is-active' : ''}" type="button" data-capability-card="${key}">
         <span class="template-card-kicker">${capability.libraryCapability}</span>
@@ -320,21 +334,42 @@ elements.capability.addEventListener('change', () => {
   renderPreview()
 })
 
+elements.search.addEventListener('input', renderCapabilityGallery)
 elements.usageMode.addEventListener('change', renderUsage)
 elements.locale.addEventListener('change', renderPreview)
 elements.markdown.addEventListener('input', renderPreview)
 
+elements.resetCapability.addEventListener('click', () => {
+  elements.markdown.value = currentCapability().markdown
+  renderPreview()
+})
+
+elements.copyMarkdown.addEventListener('click', async () => {
+  try {
+    await navigator.clipboard.writeText(elements.markdown.value)
+    elements.copyMarkdown.textContent = 'Copied'
+    setTimeout(() => {
+      elements.copyMarkdown.textContent = 'Copy Markdown'
+    }, 1200)
+  } catch {
+    elements.copyMarkdown.textContent = 'Unavailable'
+    setTimeout(() => {
+      elements.copyMarkdown.textContent = 'Copy Markdown'
+    }, 1200)
+  }
+})
+
 elements.copyUsage.addEventListener('click', async () => {
   try {
     await navigator.clipboard.writeText(elements.usageCode.textContent)
-    elements.copyUsage.textContent = 'Copied'
+    elements.usageStatus.textContent = 'Snippet copied'
     setTimeout(() => {
-      elements.copyUsage.textContent = 'Copy Snippet'
+      elements.usageStatus.textContent = ''
     }, 1200)
   } catch {
-    elements.copyUsage.textContent = 'Unavailable'
+    elements.usageStatus.textContent = 'Clipboard unavailable'
     setTimeout(() => {
-      elements.copyUsage.textContent = 'Copy Snippet'
+      elements.usageStatus.textContent = ''
     }, 1200)
   }
 })

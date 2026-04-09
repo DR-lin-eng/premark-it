@@ -1,14 +1,14 @@
 export const BROWSER_STYLES = `
 :host, .premark-editorial-root {
-  --premark-bg: linear-gradient(180deg, #f8fbff 0%, #f5f7fc 100%);
-  --premark-surface: rgba(255,255,255,0.82);
+  --premark-bg: linear-gradient(180deg, #fbfdff 0%, #f5f7fb 100%);
+  --premark-surface: rgba(255,255,255,0.78);
   --premark-surface-strong: rgba(255,255,255,0.96);
   --premark-line: rgba(60,60,67,0.14);
   --premark-text: #111114;
   --premark-soft: #5f6570;
   --premark-blue: #0071e3;
-  --premark-shadow-lg: 0 24px 64px rgba(15, 23, 42, 0.12);
-  --premark-shadow-md: 0 12px 28px rgba(15, 23, 42, 0.08);
+  --premark-shadow-lg: 0 22px 50px rgba(15, 23, 42, 0.09);
+  --premark-shadow-md: 0 10px 20px rgba(15, 23, 42, 0.06);
   --premark-radius-xl: 28px;
   --premark-radius-lg: 22px;
   --premark-radius-md: 16px;
@@ -22,12 +22,12 @@ export const BROWSER_STYLES = `
   position: relative;
   display: block;
   min-height: 240px;
-  padding: 22px;
+  padding: 26px;
   border-radius: var(--premark-radius-xl);
   border: 1px solid rgba(255,255,255,0.7);
   background:
-    radial-gradient(circle at top left, rgba(10, 132, 255, 0.12), transparent 24%),
-    radial-gradient(circle at top right, rgba(90, 200, 250, 0.1), transparent 22%),
+    radial-gradient(circle at top left, rgba(10, 132, 255, 0.08), transparent 24%),
+    radial-gradient(circle at top right, rgba(90, 200, 250, 0.08), transparent 22%),
     var(--premark-bg);
   box-shadow: var(--premark-shadow-lg);
   backdrop-filter: blur(30px) saturate(180%);
@@ -89,12 +89,12 @@ export const BROWSER_STYLES = `
 
 .premark-editorial-root .stage-item-rail-left .note-region,
 .premark-editorial-root .stage-item-rail-left .feature-figure {
-  transform: translateX(-8px);
+  transform: none;
 }
 
 .premark-editorial-root .stage-item-rail-right .note-region,
 .premark-editorial-root .stage-item-rail-right .feature-figure {
-  transform: translateX(8px);
+  transform: none;
 }
 
 .premark-editorial-root .flow-frame {
@@ -167,8 +167,8 @@ export const BROWSER_STYLES = `
 .premark-editorial-root .rendered-note,
 .premark-editorial-root .rendered-list {
   border-radius: var(--premark-radius-lg);
-  border: 1px solid rgba(255,255,255,0.72);
-  background: var(--premark-surface);
+  border: 1px solid rgba(60,60,67,0.08);
+  background: rgba(255,255,255,0.66);
   box-shadow: inset 0 1px 0 rgba(255,255,255,0.82), var(--premark-shadow-md);
 }
 
@@ -195,7 +195,7 @@ export const BROWSER_STYLES = `
   max-width: 100%;
   height: auto;
   border-radius: 20px;
-  box-shadow: 0 16px 36px rgba(15, 23, 42, 0.1);
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.08);
 }
 
 .premark-editorial-root .feature-figure figcaption {
@@ -280,9 +280,9 @@ export const BROWSER_STYLES = `
 }
 
 .premark-editorial-root .rendered-article {
-  width: min(100%, 880px);
+  width: min(100%, 980px);
   margin: 0 auto;
-  padding: 6px 4px 24px;
+  padding: 10px 10px 28px;
 }
 
 .premark-editorial-root .rendered-article > * {
@@ -290,7 +290,7 @@ export const BROWSER_STYLES = `
 }
 
 .premark-editorial-root .rendered-article > * + * {
-  margin-top: 1rem;
+  margin-top: 1.15rem;
 }
 
 .premark-editorial-root .rendered-article h1,
@@ -329,14 +329,14 @@ export const BROWSER_STYLES = `
 
 .premark-editorial-root .rendered-article p,
 .premark-editorial-root .rendered-article li {
-  font-size: 16px;
-  line-height: 1.65;
+  font-size: 17px;
+  line-height: 1.72;
 }
 
 .premark-editorial-root .rendered-article .rendered-lede {
   margin-top: 14px;
-  font-size: 20px;
-  line-height: 1.5;
+  font-size: 21px;
+  line-height: 1.55;
   font-weight: 500;
   color: var(--premark-soft);
 }
@@ -360,7 +360,7 @@ export const BROWSER_STYLES = `
 .premark-editorial-root .rendered-note,
 .premark-editorial-root .rendered-article blockquote {
   margin: 1.2rem 0;
-  padding: 1rem 1.05rem 1rem 1.15rem;
+  padding: 0.95rem 1rem 0.95rem 1.05rem;
   border-left: 3px solid rgba(10,132,255,0.3);
   color: var(--premark-soft);
 }
@@ -369,7 +369,7 @@ export const BROWSER_STYLES = `
 .premark-editorial-root .rendered-code-shell,
 .premark-editorial-root .rendered-table-shell {
   margin-top: 1.4rem;
-  padding: 12px;
+  padding: 10px;
 }
 
 .premark-editorial-root .rendered-code-shell pre,
@@ -393,7 +393,7 @@ export const BROWSER_STYLES = `
 
 .premark-editorial-root .rendered-list {
   margin-top: 1.15rem;
-  padding: 0.9rem 1rem 0.95rem 1.45rem;
+  padding: 0.85rem 1rem 0.9rem 1.35rem;
 }
 
 .premark-editorial-root .rendered-list li + li {

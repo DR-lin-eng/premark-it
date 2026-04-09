@@ -56,6 +56,11 @@
 
           <div class="controls-grid engine-controls-grid">
             <label class="control">
+              <span>Search</span>
+              <input id="capability-search" type="search" placeholder="Find a capability">
+            </label>
+
+            <label class="control">
               <span>Capability</span>
               <select id="capability-select">
                 <option value="editorial-engine">Editorial Engine</option>
@@ -95,9 +100,21 @@
 
           <div class="editor-hint-card engine-description-card">
             <div class="editor-hint-copy">
+              <p class="editor-hint-kicker">Integration</p>
+              <p id="capability-method" class="editor-hint-body"></p>
+            </div>
+          </div>
+
+          <div class="editor-hint-card engine-description-card">
+            <div class="editor-hint-copy">
               <p class="editor-hint-kicker">Description</p>
               <p id="capability-description" class="editor-hint-body"></p>
             </div>
+          </div>
+
+          <div class="footer-actions engine-source-actions">
+            <button id="reset-capability" class="secondary-button" type="button">Reset Example</button>
+            <button id="copy-markdown" class="secondary-button" type="button">Copy Markdown</button>
           </div>
 
           <textarea
@@ -124,7 +141,10 @@
             <p class="panel-kicker">Usage</p>
             <h2>Embed HTML</h2>
           </div>
-          <button id="copy-usage" class="secondary-button" type="button">Copy Snippet</button>
+          <div class="output-banner-actions">
+            <button id="copy-usage" class="secondary-button" type="button">Copy Snippet</button>
+            <span id="usage-status" class="copy-status" aria-live="polite"></span>
+          </div>
         </div>
         <p id="usage-summary" class="output-summary"></p>
         <pre id="usage-code" class="code-view"></pre>

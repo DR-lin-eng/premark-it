@@ -712,7 +712,7 @@ function enhanceClassicPreview(container) {
 
 function renderClassicPreview(stage, html, pending = false) {
   stage.innerHTML = `
-    <div class="premark-status">${pending ? 'Preparing editorial layout…' : 'Classic preview'}</div>
+    ${pending ? '<div class="premark-status">Preparing editorial layout…</div>' : ''}
     <div class="rendered-article">${html}</div>
   `
   stage.classList.toggle('premark-rendered-stage', true)
